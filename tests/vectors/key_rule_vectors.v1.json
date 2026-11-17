@@ -1,0 +1,756 @@
+{
+ "schema": "requisition_key_rule_vectors.v1",
+ "rule": "LabKeyRule.standing/3 (lib/autonomous_agency/authority/execute_api/lab_key_rule.ex)",
+ "note": "ONE vector file for every verifier. A null entry member means the member is ABSENT from the key entry. Each verifier test builds a real signed record whose signed occurred_at is occurred_at (absent when null) under an entry with these members, and expects pass (expect null) or a refusal naming the reason. Order of checks: status, window, signer. The `documents` section is the bound on the READERS: every strict JSON reader refuses nesting deeper than max_depth containers and any integer outside +-max_integer, with its own refusal (never a traceback); `ok` documents are read. The ed25519_* sections are the KEY MATERIAL rule: a public key is accepted only if it decodes canonically, is not small-order and [L]P is the identity (prime-order subgroup); a signature whose R is not a canonical point encoding or whose S >= L is refused; the two ed25519_triples are the measured cases on which the deployed verifiers disagreed (h mod L versus full h).",
+ "reasons": [
+  "key_revoked",
+  "key_status_unusable",
+  "key_window_unreadable",
+  "signed_instant_unreadable",
+  "key_not_valid_at_signing",
+  "signer_not_accepted"
+ ],
+ "vectors": [
+  {
+   "name": "active_open_inside",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": null
+  },
+  {
+   "name": "active_open_far_future",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2030-01-01T00:00:00Z",
+   "accept_signers": null,
+   "expect": null
+  },
+  {
+   "name": "active_before_valid_from",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-10-31T23:59:59Z",
+   "accept_signers": null,
+   "expect": "key_not_valid_at_signing"
+  },
+  {
+   "name": "valid_from_is_inclusive",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-01T00:00:00Z",
+   "accept_signers": null,
+   "expect": null
+  },
+  {
+   "name": "retired_inside",
+   "entry": {
+    "status": "retired",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": null
+  },
+  {
+   "name": "retired_last_second_inside",
+   "entry": {
+    "status": "retired",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-10T11:59:59Z",
+   "accept_signers": null,
+   "expect": null
+  },
+  {
+   "name": "retired_valid_to_is_exclusive",
+   "entry": {
+    "status": "retired",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-10T12:00:00Z",
+   "accept_signers": null,
+   "expect": "key_not_valid_at_signing"
+  },
+  {
+   "name": "retired_after_window",
+   "entry": {
+    "status": "retired",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-11T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_not_valid_at_signing"
+  },
+  {
+   "name": "retired_before_window",
+   "entry": {
+    "status": "retired",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-10-01T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_not_valid_at_signing"
+  },
+  {
+   "name": "retired_without_valid_to",
+   "entry": {
+    "status": "retired",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_status_unusable",
+   "reference_differs": [
+    "verify_receipt"
+   ],
+   "note": "verify_receipt.py (released by tag) treats a null valid_to as open-ended whatever the status; the rule refuses a retired key with no end, which no honest retirement writes"
+  },
+  {
+   "name": "active_with_valid_to_inside",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": null
+  },
+  {
+   "name": "active_with_valid_to_after",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-10T12:00:01Z",
+   "accept_signers": null,
+   "expect": "key_not_valid_at_signing"
+  },
+  {
+   "name": "compromised_before_change",
+   "entry": {
+    "status": "compromised",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_revoked",
+   "note": "earlier records are key_revoked too: no verifier here holds the log binding that would countersign them before the revocation instant"
+  },
+  {
+   "name": "compromised_after_change",
+   "entry": {
+    "status": "compromised",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-11T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_revoked"
+  },
+  {
+   "name": "revoked_alias",
+   "entry": {
+    "status": "revoked",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_revoked",
+   "reference_differs": [
+    "verify_receipt"
+   ],
+   "note": "verify_receipt.py's vocabulary has compromised, not revoked: it answers its key_status_not_active; both refuse"
+  },
+  {
+   "name": "status_example",
+   "entry": {
+    "status": "example",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_status_unusable"
+  },
+  {
+   "name": "status_unknown",
+   "entry": {
+    "status": "pending",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_status_unusable"
+  },
+  {
+   "name": "status_absent",
+   "entry": {
+    "status": null,
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_status_unusable"
+  },
+  {
+   "name": "valid_from_unreadable",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_window_unreadable"
+  },
+  {
+   "name": "valid_from_absent",
+   "entry": {
+    "status": "active",
+    "valid_from": null,
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_window_unreadable"
+  },
+  {
+   "name": "valid_to_unreadable",
+   "entry": {
+    "status": "retired",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10 12:00:00",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_window_unreadable"
+  },
+  {
+   "name": "signed_instant_fraction",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00.5Z",
+   "accept_signers": null,
+   "expect": "signed_instant_unreadable"
+  },
+  {
+   "name": "signed_instant_offset",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00+00:00",
+   "accept_signers": null,
+   "expect": "signed_instant_unreadable"
+  },
+  {
+   "name": "signed_instant_absent",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": null,
+   "accept_signers": null,
+   "expect": "signed_instant_unreadable"
+  },
+  {
+   "name": "signer_kms_accepted",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": [
+    "kms"
+   ],
+   "expect": null
+  },
+  {
+   "name": "signer_dev_refused_by_kms_only",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": [
+    "kms"
+   ],
+   "expect": "signer_not_accepted"
+  },
+  {
+   "name": "signer_dev_in_window_refused_by_kms_only",
+   "entry": {
+    "status": "retired",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": [
+    "kms"
+   ],
+   "expect": "signer_not_accepted"
+  },
+  {
+   "name": "signer_dev_allowed_when_listed",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": [
+    "dev",
+    "kms"
+   ],
+   "expect": null
+  },
+  {
+   "name": "signer_dev_allowed_without_policy",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": null
+  },
+  {
+   "name": "signer_absent_refused_by_policy",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": null,
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": [
+    "kms"
+   ],
+   "expect": "signer_not_accepted"
+  },
+  {
+   "name": "window_beats_signer",
+   "entry": {
+    "status": "retired",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-11T00:00:00Z",
+   "accept_signers": [
+    "kms"
+   ],
+   "expect": "key_not_valid_at_signing"
+  },
+  {
+   "name": "revoked_beats_window",
+   "entry": {
+    "status": "compromised",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": "2026-11-10T12:00:00Z",
+    "signer": "dev",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-11T00:00:00Z",
+   "accept_signers": [
+    "kms"
+   ],
+   "expect": "key_revoked"
+  },
+  {
+   "name": "signed_instant_trailing_bytes",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Zjunk",
+   "accept_signers": null,
+   "expect": "signed_instant_unreadable"
+  },
+  {
+   "name": "valid_from_trailing_bytes",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Zx",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_window_unreadable"
+  },
+  {
+   "name": "signed_instant_trailing_newline",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z\n",
+   "accept_signers": null,
+   "expect": "signed_instant_unreadable",
+   "reference_differs": [
+    "verify_receipt"
+   ],
+   "note": "the released verifier's pattern ends in $, which matches before a trailing newline"
+  },
+  {
+   "name": "valid_from_trailing_newline",
+   "entry": {
+    "status": "active",
+    "valid_from": "2026-11-01T00:00:00Z\n",
+    "valid_to": null,
+    "signer": "kms",
+    "status_changed_at": "2026-11-10T12:00:00Z"
+   },
+   "occurred_at": "2026-11-05T00:00:00Z",
+   "accept_signers": null,
+   "expect": "key_window_unreadable",
+   "reference_differs": [
+    "verify_receipt"
+   ]
+  }
+ ],
+ "max_depth": 64,
+ "max_integer": 9007199254740991,
+ "documents": [
+  {
+   "name": "depth_64_ok",
+   "text": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+   "expect": "ok"
+  },
+  {
+   "name": "depth_65_refused",
+   "text": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+   "expect": "refused"
+  },
+  {
+   "name": "depth_64_objects_ok",
+   "text": "{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":1}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}",
+   "expect": "ok"
+  },
+  {
+   "name": "depth_65_objects_refused",
+   "text": "{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":1}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}",
+   "expect": "refused"
+  },
+  {
+   "name": "brackets_inside_strings_are_not_depth",
+   "text": "[\"[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[\\\"[\",1]",
+   "expect": "ok"
+  },
+  {
+   "name": "max_integer_ok",
+   "text": "9007199254740991",
+   "expect": "ok"
+  },
+  {
+   "name": "min_integer_ok",
+   "text": "-9007199254740991",
+   "expect": "ok"
+  },
+  {
+   "name": "integer_above_max_refused",
+   "text": "9007199254740992",
+   "expect": "refused"
+  },
+  {
+   "name": "integer_below_min_refused",
+   "text": "-9007199254740992",
+   "expect": "refused"
+  },
+  {
+   "name": "integer_20_digits_refused",
+   "text": "12345678901234567890",
+   "expect": "refused"
+  },
+  {
+   "name": "integer_400_digits_refused",
+   "text": "10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "expect": "refused"
+  },
+  {
+   "name": "integer_inside_object_refused",
+   "text": "{\"a\":[1,2,9007199254740992]}",
+   "expect": "refused"
+  },
+  {
+   "name": "fraction_is_not_an_integer_ok",
+   "text": "12345678901234567890.5",
+   "expect": "ok"
+  },
+  {
+   "name": "exponent_is_not_an_integer_ok",
+   "text": "1e30",
+   "expect": "ok"
+  }
+ ],
+ "ed25519_keys": [
+  {
+   "name": "honest_prime_order",
+   "public_key": "68a4e4997caffc5e6833ca52bc0ae4a33e780652f566bb061d70ff8bc2678bd0",
+   "expect": "ok"
+  },
+  {
+   "name": "torsion_order_4_00000000_00",
+   "public_key": "0000000000000000000000000000000000000000000000000000000000000000",
+   "expect": "refused"
+  },
+  {
+   "name": "mixed_order_honest_plus_torsion_order_4_00000000_00",
+   "public_key": "56fe0edd58e5663c085891306e7953a4d34a151050585d0c1263bbae80a3b717",
+   "expect": "refused"
+  },
+  {
+   "name": "torsion_order_4_00000000_80",
+   "public_key": "0000000000000000000000000000000000000000000000000000000000000080",
+   "expect": "refused"
+  },
+  {
+   "name": "mixed_order_honest_plus_torsion_order_4_00000000_80",
+   "public_key": "9701f122a71a99c3f7a76ecf9186ac5b2cb5eaefafa7a2f3ed9c44517f5c48e8",
+   "expect": "refused"
+  },
+  {
+   "name": "torsion_order_1_01000000_00",
+   "public_key": "0100000000000000000000000000000000000000000000000000000000000000",
+   "expect": "refused"
+  },
+  {
+   "name": "torsion_order_8_26e8958f_05",
+   "public_key": "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+   "expect": "refused"
+  },
+  {
+   "name": "mixed_order_honest_plus_torsion_order_8_26e8958f_05",
+   "public_key": "4d18fa03c9eaa3af26900661b7ff307fc3110c00ce1a94137e4af58fd59df9db",
+   "expect": "refused"
+  },
+  {
+   "name": "torsion_order_8_26e8958f_85",
+   "public_key": "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85",
+   "expect": "refused"
+  },
+  {
+   "name": "mixed_order_honest_plus_torsion_order_8_26e8958f_85",
+   "public_key": "aa77c508ef3188a9ce10f7832ae4c172d0c9bec864cb577c6377332eb88bca12",
+   "expect": "refused"
+  },
+  {
+   "name": "torsion_order_8_c7176a70_7a",
+   "public_key": "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+   "expect": "refused"
+  },
+  {
+   "name": "mixed_order_honest_plus_torsion_order_8_c7176a70_7a",
+   "public_key": "43883af710ce775631ef087cd51b3e8d2f3641379b34a8839c88ccd1477435ed",
+   "expect": "refused"
+  },
+  {
+   "name": "torsion_order_8_c7176a70_fa",
+   "public_key": "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+   "expect": "refused"
+  },
+  {
+   "name": "mixed_order_honest_plus_torsion_order_8_c7176a70_fa",
+   "public_key": "a0e705fc36155c50d96ff99e4800cf803ceef3ff31e56bec81b50a702a620624",
+   "expect": "refused"
+  },
+  {
+   "name": "torsion_order_2_ecffffff_7f",
+   "public_key": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+   "expect": "refused"
+  },
+  {
+   "name": "mixed_order_honest_plus_torsion_order_2_ecffffff_7f",
+   "public_key": "855b1b66835003a197cc35ad43f51b5cc187f9ad0a9944f9e28f00743d98742f",
+   "expect": "refused"
+  },
+  {
+   "name": "noncanonical_y_plus_p_y3",
+   "public_key": "f0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+   "expect": "refused"
+  },
+  {
+   "name": "noncanonical_identity_y_plus_p",
+   "public_key": "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+   "expect": "refused"
+  },
+  {
+   "name": "not_on_the_curve_y2",
+   "public_key": "0200000000000000000000000000000000000000000000000000000000000000",
+   "expect": "refused"
+  },
+  {
+   "name": "length_31",
+   "public_key": "68a4e4997caffc5e6833ca52bc0ae4a33e780652f566bb061d70ff8bc26789",
+   "expect": "refused"
+  }
+ ],
+ "ed25519_signatures": [
+  {
+   "name": "honest",
+   "signature": "ea7c108db9d2c7a58b1bbd41b549a37c460142207d45af4dffb283fe9f1878510f487f4556d81563138508c81765e9462919ba269bf7f7ef11c353f561b35408",
+   "expect": "ok"
+  },
+  {
+   "name": "honest_S_plus_L",
+   "signature": "ea7c108db9d2c7a58b1bbd41b549a37c460142207d45af4dffb283fe9f187851fc1b75a2703b28bbe921006bf65ec85b2919ba269bf7f7ef11c353f561b35418",
+   "expect": "refused"
+  },
+  {
+   "name": "R_identity_enc_010000",
+   "signature": "0100000000000000000000000000000000000000000000000000000000000000db8d07448f17c81632e2dc0aedc7d43f1bee348c30dc814879cf53ea0f05cc06",
+   "expect": "ok"
+  },
+  {
+   "name": "R_identity_enc_eeffff",
+   "signature": "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f1ae0f6514b8d7be1c24e920a230ca517d866da8c6f5001f9b8790ceaf3e6b605",
+   "expect": "refused"
+  },
+  {
+   "name": "S_equals_L",
+   "signature": "ea7c108db9d2c7a58b1bbd41b549a37c460142207d45af4dffb283fe9f187851edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010",
+   "expect": "refused"
+  },
+  {
+   "name": "S_is_L_minus_1",
+   "signature": "ea7c108db9d2c7a58b1bbd41b549a37c460142207d45af4dffb283fe9f187851ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010",
+   "expect": "ok"
+  },
+  {
+   "name": "R_not_on_curve",
+   "signature": "02000000000000000000000000000000000000000000000000000000000000000f487f4556d81563138508c81765e9462919ba269bf7f7ef11c353f561b35408",
+   "expect": "refused"
+  },
+  {
+   "name": "length_65",
+   "signature": "ea7c108db9d2c7a58b1bbd41b549a37c460142207d45af4dffb283fe9f1878510f487f4556d81563138508c81765e9462919ba269bf7f7ef11c353f561b3540800",
+   "expect": "refused"
+  },
+  {
+   "name": "length_63",
+   "signature": "ea7c108db9d2c7a58b1bbd41b549a37c460142207d45af4dffb283fe9f1878510f487f4556d81563138508c81765e9462919ba269bf7f7ef11c353f561b354",
+   "expect": "refused"
+  }
+ ],
+ "ed25519_triples": [
+  {
+   "name": "mixed_key_h%8=6",
+   "public_key": "4d18fa03c9eaa3af26900661b7ff307fc3110c00ce1a94137e4af58fd59df9db",
+   "message": "6d697865642d32",
+   "signature": "ea7c108db9d2c7a58b1bbd41b549a37c460142207d45af4dffb283fe9f187851e121fef88c7ca1f6b7b3e2aa5f74418af2bfdd9d5524a5bf7e97d4e9d073570d",
+   "expect": "refused",
+   "note": "a mixed-order key: OpenSSL (h mod L) and the frozen verifier (full h) disagree on this signature; the key is refused, so none can"
+  },
+  {
+   "name": "mixed_key_h%8=0",
+   "public_key": "4d18fa03c9eaa3af26900661b7ff307fc3110c00ce1a94137e4af58fd59df9db",
+   "message": "6d697865642d33",
+   "signature": "ea7c108db9d2c7a58b1bbd41b549a37c460142207d45af4dffb283fe9f18785122e5e44f8fb6e1fb766e969501cd28c6b765fbf780aa0cc636fbc0ef5ae65006",
+   "expect": "refused",
+   "note": "a mixed-order key: OpenSSL (h mod L) and the frozen verifier (full h) disagree on this signature; the key is refused, so none can"
+  }
+ ],
+ "ed25519_note": "A public key is accepted only if it decodes canonically, is not small-order and [L]P is the identity; a signature is refused when R is not a canonical point encoding or S >= L (the key rule). Generated with independent arithmetic."
+}

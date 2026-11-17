@@ -1,0 +1,30 @@
+{
+  "_comment": "AWS documented shape, fetched 2026-11-09, not a live Gateway. The REQUEST interceptor input example, verbatim in structure (placeholders filled), passRequestHeaders true. Authorization is a SigV4 header (G1: the deployed Gateway is AWS_IAM inbound; the documented example shows a bearer), changed 2026-11-10.",
+  "_source": [
+    "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-interceptors-types.html",
+    "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-interceptors-configuration.html"
+  ],
+  "event": {
+    "interceptorInputVersion": "1.0",
+    "mcp": {
+      "rawGatewayRequest": {
+        "body": "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"tools/list\"}"
+      },
+      "gatewayRequest": {
+        "path": "/mcp",
+        "httpMethod": "POST",
+        "headers": {
+          "Accept": "application/json",
+          "Authorization": "AWS4-HMAC-SHA256 Credential=AKIAFIXTURENOTREAL01/20261109/us-west-2/bedrock-agentcore/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=FIXTURE-NOT-A-REAL-TOKEN",
+          "Mcp-Session-Id": "mcp-session-0b1c2d3e",
+          "User-Agent": "fixture-client/1.0"
+        },
+        "body": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/list"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,721 @@
+{
+ "meta": {
+  "generator": "tools/gen_python_vectors.py",
+  "python": "3.12.3",
+  "reference": "requisition-aws",
+  "requisition_aws_tree": "d7c9330bbdf5d28edfa97d30f93647c94cfcfcf5",
+  "seed": 20261110,
+  "unicodedata": "15.0.0"
+ },
+ "raw": [
+  {
+   "bytes_b64": "eyJhIjoxfQ==",
+   "code": null,
+   "text": "{\"a\":1}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a",
+   "text": "{\"a\":1.0}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a",
+   "text": "{\"a\":1e2}"
+  },
+  {
+   "bytes_b64": "eyJhIjowfQ==",
+   "code": null,
+   "text": "{\"a\":-0}"
+  },
+  {
+   "bytes_b64": "eyJhIjo5MDA3MTk5MjU0NzQwOTkxfQ==",
+   "code": null,
+   "text": "{\"a\":9007199254740991}"
+  },
+  {
+   "code": "malformed_member",
+   "path": "a",
+   "text": "{\"a\":9007199254740992}"
+  },
+  {
+   "code": "malformed_member",
+   "path": "a",
+   "text": "{\"a\":-9007199254740992}"
+  },
+  {
+   "code": "missing_member",
+   "path": "a",
+   "text": "{\"a\":null}"
+  },
+  {
+   "code": "missing_member",
+   "path": "a.1",
+   "text": "{\"a\":[1,null]}"
+  },
+  {
+   "code": "forbidden_character",
+   "path": "a",
+   "text": "{\"a\":\"x\\u0000\"}"
+  },
+  {
+   "code": "forbidden_character",
+   "path": "a",
+   "text": "{\"a\":\"\\u200b\"}"
+  },
+  {
+   "code": "string_not_nfc",
+   "path": "a",
+   "text": "{\"a\":\"e\\u0301\"}"
+  },
+  {
+   "bytes_b64": "eyJhIjoiw6kifQ==",
+   "code": null,
+   "text": "{\"a\":\"\\u00e9\"}"
+  },
+  {
+   "code": "display_value_redactable",
+   "path": "a",
+   "text": "{\"a\":\"sk-abc\"}"
+  },
+  {
+   "code": "display_value_redactable",
+   "path": "a",
+   "text": "{\"a\":\"Bearer abc\"}"
+  },
+  {
+   "code": "forbidden_character",
+   "path": "a",
+   "text": "{\"a\":\"\\u2028\"}"
+  },
+  {
+   "code": "member_out_of_schema",
+   "path": "act_type",
+   "text": "{\"act_type\":\"x\"}"
+  },
+  {
+   "code": "member_out_of_schema",
+   "path": "members",
+   "text": "{\"members\":[]}"
+  },
+  {
+   "bytes_b64": "eyJhIjp7ImIiOnsiYyI6Im9rIn19fQ==",
+   "code": null,
+   "text": "{\"a\":{\"b\":{\"c\":\"ok\"}}}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a.b.c",
+   "text": "{\"a\":{\"b\":{\"c\":1.5}}}"
+  },
+  {
+   "parse": "refused",
+   "text": "{\"a\":1,\"a\":2}"
+  },
+  {
+   "code": "malformed_member",
+   "path": "",
+   "text": "[1]"
+  },
+  {
+   "code": "malformed_member",
+   "path": "",
+   "text": "\"s\""
+  },
+  {
+   "bytes_b64": "eyJfX3Byb3RvX18iOnsicG9sbHV0ZWQiOnRydWV9fQ==",
+   "code": null,
+   "text": "{\"__proto__\":{\"polluted\":true}}"
+  },
+  {
+   "code": "forbidden_character",
+   "path": "k\u200b",
+   "text": "{\"k\\u200b\":1}"
+  },
+  {
+   "code": "forbidden_character",
+   "path": "a",
+   "text": "{\"a\":\"line\\nbreak\"}"
+  },
+  {
+   "code": "forbidden_character",
+   "path": "a",
+   "text": "{\"a\":\"tab\\there\"}"
+  },
+  {
+   "code": "display_value_redactable",
+   "path": "a",
+   "text": "{\"a\":\"password=hunter2\"}"
+  },
+  {
+   "bytes_b64": "eyJhIjp0cnVlLCJiIjpmYWxzZX0=",
+   "code": null,
+   "text": "{\"a\":true,\"b\":false}"
+  },
+  {
+   "parse": "refused",
+   "text": "{\"a\":NaN}"
+  },
+  {
+   "parse": "refused",
+   "text": "{\"a\":Infinity}"
+  },
+  {
+   "parse": "refused",
+   "text": "{\"a\":-Infinity}"
+  },
+  {
+   "code": "malformed_member",
+   "path": "a",
+   "text": "{\"a\":\"\\ud800\"}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a",
+   "text": "{\"a\":1e23}"
+  },
+  {
+   "code": "malformed_member",
+   "path": "a",
+   "text": "{\"a\":100000000000000000000000}"
+  },
+  {
+   "code": "malformed_member",
+   "path": "a",
+   "text": "{\"a\":-100000000000000000000000}"
+  },
+  {
+   "parse": "refused",
+   "text": "{\"a\":1e400}"
+  },
+  {
+   "parse": "refused",
+   "text": "{\"a\":-1e400}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a",
+   "text": "{\"a\":1.5}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a",
+   "text": "{\"a\":-0.0}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a",
+   "text": "{\"a\":0.0}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a",
+   "text": "{\"a\":1e5}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a",
+   "text": "{\"a\":1E5}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a",
+   "text": "{\"a\":1e-7}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a",
+   "text": "{\"a\":-2.5e+3}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a.1",
+   "text": "{\"a\":[1,2.5]}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a.b.1.c",
+   "text": "{\"a\":{\"b\":[0,{\"c\":-1.25}]}}"
+  },
+  {
+   "code": "float_refused",
+   "path": "b",
+   "text": "{\"a\":\"x\\u0000\",\"b\":1.5}"
+  },
+  {
+   "code": "float_refused",
+   "path": "b",
+   "text": "{\"a\":\"\\u200b\",\"b\":0.5}"
+  },
+  {
+   "code": "float_refused",
+   "path": "b",
+   "text": "{\"a\":null,\"b\":0.5}"
+  },
+  {
+   "code": "float_refused",
+   "path": "act_type",
+   "text": "{\"act_type\":1.5}"
+  },
+  {
+   "code": "float_refused",
+   "path": "a",
+   "text": "{\"b\":1.5,\"a\":2.5}"
+  },
+  {
+   "code": "float_refused",
+   "path": "members.0",
+   "text": "{\"members\":[0.5]}"
+  },
+  {
+   "code": "malformed_member",
+   "path": "",
+   "text": "1.5"
+  },
+  {
+   "code": "malformed_member",
+   "path": "",
+   "text": "[1.5]"
+  },
+  {
+   "code": "malformed_member",
+   "path": "a.b.1",
+   "text": "{\"a\":{\"b\":[0,-9007199254740993]}}"
+  },
+  {
+   "code": "malformed_member",
+   "path": "a",
+   "text": "{\"a\":1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000}"
+  },
+  {
+   "parse": "refused",
+   "text": "{\"a\":10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000}"
+  }
+ ],
+ "schema": [
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": null,
+   "what": "good"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 0,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "display_member_out_of_range",
+   "path": "args.amount_minor",
+   "what": "amount zero"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 100000001,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "display_member_out_of_range",
+   "path": "args.amount_minor",
+   "what": "amount over"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": "10",
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "malformed_member",
+   "path": "args.amount_minor",
+   "what": "amount string"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": true,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "malformed_member",
+   "path": "args.amount_minor",
+   "what": "amount bool"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "currency": "JPY",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "malformed_member",
+   "path": "args.currency",
+   "what": "currency JPY"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "cc": "someone",
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "member_out_of_schema",
+   "path": "args.cc",
+   "what": "extra arg"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "currency": "USD",
+     "reason": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "display_member_out_of_range",
+   "path": "args.reason",
+   "what": "reason long"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "currency": "USD",
+     "reason": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": null,
+   "what": "reason 200"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "other.tool"
+   },
+   "code": "malformed_member",
+   "path": "tool",
+   "what": "tool other"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "extra": 1,
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "member_out_of_schema",
+   "path": "extra",
+   "what": "top extra"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "sk-live",
+     "amount_minor": 1250,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "display_value_redactable",
+   "path": "args.account",
+   "what": "redactable account"
+  },
+  {
+   "args": {
+    "agent": "",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "display_member_out_of_range",
+   "path": "agent",
+   "what": "agent empty"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": [
+     1
+    ],
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "malformed_member",
+   "path": "args",
+   "what": "args not object"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "currency": "USD",
+     "reason": "\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": null,
+   "what": "reason non-BMP 200"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "currency": "USD",
+     "reason": "\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02\ud83d\ude02"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "display_member_out_of_range",
+   "path": "args.reason",
+   "what": "reason non-BMP 201"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 12.5,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "float_refused",
+   "path": "args.amount_minor",
+   "what": "amount float"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": -0.0,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "float_refused",
+   "path": "args.amount_minor",
+   "what": "amount -0.0"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250.0,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "float_refused",
+   "path": "args.amount_minor",
+   "what": "amount integral float"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": 1.5,
+     "amount_minor": 1250,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "float_refused",
+   "path": "args.account",
+   "what": "account float"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": 1.0
+   },
+   "code": "float_refused",
+   "path": "tool",
+   "what": "tool float"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "cc": 0.5,
+     "currency": "USD",
+     "reason": "duplicate charge"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "float_refused",
+   "path": "args.cc",
+   "what": "extra float arg"
+  },
+  {
+   "args": {
+    "agent": "refund-agent",
+    "args": {
+     "account": "acct-7781",
+     "amount_minor": 1250,
+     "currency": "USD"
+    },
+    "session": "s-1",
+    "tool": "payments.refund_send"
+   },
+   "code": "missing_member",
+   "path": "args.reason",
+   "what": "reason missing"
+  }
+ ],
+ "schema_entries": [
+  {
+   "max_length": 64,
+   "min_length": 1,
+   "path": "agent",
+   "required": true,
+   "type": "s"
+  },
+  {
+   "max_length": 64,
+   "min_length": 1,
+   "path": "session",
+   "required": true,
+   "type": "s"
+  },
+  {
+   "path": "tool",
+   "required": true,
+   "type": "enum",
+   "values": [
+    "payments.refund_send"
+   ]
+  },
+  {
+   "path": "args",
+   "required": true,
+   "type": "obj"
+  },
+  {
+   "max": 100000000,
+   "min": 1,
+   "path": "args.amount_minor",
+   "required": true,
+   "type": "i"
+  },
+  {
+   "path": "args.currency",
+   "required": true,
+   "type": "enum",
+   "values": [
+    "USD",
+    "EUR",
+    "GBP"
+   ]
+  },
+  {
+   "max_length": 64,
+   "min_length": 1,
+   "path": "args.account",
+   "required": true,
+   "type": "s"
+  },
+  {
+   "max_length": 200,
+   "min_length": 1,
+   "path": "args.reason",
+   "required": true,
+   "type": "s"
+  }
+ ]
+}

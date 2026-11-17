@@ -1,0 +1,79 @@
+{
+  "schema": "requisition.lab.seed.v1",
+  "set": "aws_demo",
+  "act_types": [
+    {
+      "note": "An agent's refund tool. Amounts are integer minor units (no floats). A tool with no registered schema is denied by the adapter.",
+      "registration": {
+        "name": "payments.refund_send",
+        "class": "high",
+        "sanctioners_required": 2,
+        "sanctionable": true,
+        "irreversible": true,
+        "schema_version": 1,
+        "gating": "sanctioned",
+        "act_hash_derivation": "args_sha384",
+        "display_schema": [
+          {
+            "path": "agent",
+            "type": "s",
+            "required": true,
+            "min_length": 1,
+            "max_length": 64
+          },
+          {
+            "path": "session",
+            "type": "s",
+            "required": true,
+            "min_length": 1,
+            "max_length": 64
+          },
+          {
+            "path": "tool",
+            "type": "enum",
+            "required": true,
+            "values": [
+              "payments.refund_send"
+            ]
+          },
+          {
+            "path": "args",
+            "type": "obj",
+            "required": true
+          },
+          {
+            "path": "args.amount_minor",
+            "type": "i",
+            "required": true,
+            "min": 1,
+            "max": 100000000
+          },
+          {
+            "path": "args.currency",
+            "type": "enum",
+            "required": true,
+            "values": [
+              "USD",
+              "EUR",
+              "GBP"
+            ]
+          },
+          {
+            "path": "args.account",
+            "type": "s",
+            "required": true,
+            "min_length": 1,
+            "max_length": 64
+          },
+          {
+            "path": "args.reason",
+            "type": "s",
+            "required": true,
+            "min_length": 1,
+            "max_length": 200
+          }
+        ]
+      }
+    }
+  ]
+}

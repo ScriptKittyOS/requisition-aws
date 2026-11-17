@@ -1,0 +1,9 @@
+requisition-aws
+Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
+
+Licensed under the Apache License, Version 2.0 (the "License"); see the file LICENSE.
+
+This repository also contains third-party files under their own licences, listed in THIRD-PARTY.md.
+The ML-DSA-87 test vectors in tests/vectors/mldsa87/acvp_sigver_mldsa87_pure_external.json come from the
+National Institute of Standards and Technology (NIST), ACVP-Server release v1.1.0.43; the file is a subset of the
+upstream file, made on 2026-11-09 as tests/vectors/mldsa87/PROVENANCE.md describes.

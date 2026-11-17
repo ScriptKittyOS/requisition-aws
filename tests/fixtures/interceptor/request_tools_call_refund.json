@@ -1,0 +1,40 @@
+{
+  "_comment": "AWS documented shape, fetched 2026-11-09, not a live Gateway. The REQUEST input shape carrying tools/call; the tool name follows ${target_name}___${tool_name}. Authorization is a SigV4 header (G1: the deployed Gateway is AWS_IAM inbound; the documented example shows a bearer), changed 2026-11-10.",
+  "_source": [
+    "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-interceptors-types.html",
+    "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-interceptors-configuration.html",
+    "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-tool-naming.html"
+  ],
+  "event": {
+    "interceptorInputVersion": "1.0",
+    "mcp": {
+      "rawGatewayRequest": {
+        "body": "{\"jsonrpc\": \"2.0\", \"id\": 7, \"method\": \"tools/call\", \"params\": {\"name\": \"refunds___payments_refund_send\", \"arguments\": {\"amount_minor\": 1250, \"currency\": \"USD\", \"account\": \"acct-7781\", \"reason\": \"duplicate charge\"}}}"
+      },
+      "gatewayRequest": {
+        "path": "/mcp",
+        "httpMethod": "POST",
+        "headers": {
+          "Accept": "application/json",
+          "Authorization": "AWS4-HMAC-SHA256 Credential=AKIAFIXTURENOTREAL01/20261109/us-west-2/bedrock-agentcore/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=FIXTURE-NOT-A-REAL-TOKEN",
+          "Mcp-Session-Id": "mcp-session-0b1c2d3e",
+          "User-Agent": "fixture-client/1.0"
+        },
+        "body": {
+          "jsonrpc": "2.0",
+          "id": 7,
+          "method": "tools/call",
+          "params": {
+            "name": "refunds___payments_refund_send",
+            "arguments": {
+              "amount_minor": 1250,
+              "currency": "USD",
+              "account": "acct-7781",
+              "reason": "duplicate charge"
+            }
+          }
+        }
+      }
+    }
+  }
+}

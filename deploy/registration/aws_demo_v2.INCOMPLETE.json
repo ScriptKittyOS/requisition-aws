@@ -1,0 +1,89 @@
+{
+ "schema": "requisition.lab.seed.v1",
+ "set": "aws_demo_v2_incomplete",
+ "incomplete": "INCOMPLETE: the tool_digest enum holds only the Strands digest. The Gateway's digest comes only from a live tools/list capture (deploy/gateway/capture_tools_list.py --go, operator-run); deploy/registration/fill_gateway_digest.py then writes the complete aws_demo_v2.v1.json. This file's set name is not aws_demo_v2, so mix requisition.lab.seed --set aws_demo_v2 refuses it (seed_file_set_mismatch).",
+ "note": "G2: payments.refund_send at schema_version 2 under a new name (a second payments.refund_send is refused: act_types.ex:102,110). v1's schema plus tool_digest, an enum of the approved tool-definition digests (catalog.py: SHA-384 over CanonicalPayload v3 of name/title/description/inputSchema/outputSchema/annotations). Requisition refuses any other digest at propose. The approval page shows the digest, not the description. Registered through a registration that two separate approver accounts approve; this repository registers nothing.",
+ "act_types": [
+  {
+   "note": "An agent's refund tool. Amounts are integer minor units (no floats). A tool with no registered schema is denied by the adapter. v2: the tool definition is bound by digest.",
+   "registration": {
+    "name": "payments.refund_send_v2",
+    "class": "high",
+    "sanctioners_required": 2,
+    "sanctionable": true,
+    "irreversible": true,
+    "schema_version": 2,
+    "gating": "sanctioned",
+    "act_hash_derivation": "args_sha384",
+    "display_schema": [
+     {
+      "path": "agent",
+      "type": "s",
+      "required": true,
+      "min_length": 1,
+      "max_length": 64
+     },
+     {
+      "path": "session",
+      "type": "s",
+      "required": true,
+      "min_length": 1,
+      "max_length": 64
+     },
+     {
+      "path": "tool",
+      "type": "enum",
+      "required": true,
+      "values": [
+       "payments.refund_send_v2"
+      ]
+     },
+     {
+      "path": "args",
+      "type": "obj",
+      "required": true
+     },
+     {
+      "path": "args.amount_minor",
+      "type": "i",
+      "required": true,
+      "min": 1,
+      "max": 100000000
+     },
+     {
+      "path": "args.currency",
+      "type": "enum",
+      "required": true,
+      "values": [
+       "USD",
+       "EUR",
+       "GBP"
+      ]
+     },
+     {
+      "path": "args.account",
+      "type": "s",
+      "required": true,
+      "min_length": 1,
+      "max_length": 64
+     },
+     {
+      "path": "args.reason",
+      "type": "s",
+      "required": true,
+      "min_length": 1,
+      "max_length": 200
+     },
+     {
+      "path": "tool_digest",
+      "type": "enum",
+      "required": true,
+      "values": [
+       "74a41ba037df8e995f65e9046111e602383f75a67e750f03943e195db835a5d106c5b893dd1b865e4126dc8f6a3170f3"
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}

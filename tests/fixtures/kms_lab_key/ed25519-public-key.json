@@ -1,0 +1,9 @@
+{
+ "entries": [
+  {
+   "algorithm": "ed25519",
+   "public_key": "Rx/Ez8npOZtQyR7CevbNFz8WYGWhgx5LkVIESKWg1IE=",
+   "signer": "kms"
+  }
+ ]
+}

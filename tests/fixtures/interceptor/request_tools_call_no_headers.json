@@ -1,0 +1,33 @@
+{
+  "_comment": "AWS documented shape, fetched 2026-11-09, not a live Gateway. passRequestHeaders false (the default): no headers field, so no Mcp-Session-Id.",
+  "_source": [
+    "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-interceptors-types.html",
+    "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-interceptors-configuration.html"
+  ],
+  "event": {
+    "interceptorInputVersion": "1.0",
+    "mcp": {
+      "rawGatewayRequest": {
+        "body": "{\"jsonrpc\": \"2.0\", \"id\": 8, \"method\": \"tools/call\", \"params\": {\"name\": \"refunds___payments_refund_send\", \"arguments\": {\"amount_minor\": 1250, \"currency\": \"USD\", \"account\": \"acct-7781\", \"reason\": \"duplicate charge\"}}}"
+      },
+      "gatewayRequest": {
+        "path": "/mcp",
+        "httpMethod": "POST",
+        "body": {
+          "jsonrpc": "2.0",
+          "id": 8,
+          "method": "tools/call",
+          "params": {
+            "name": "refunds___payments_refund_send",
+            "arguments": {
+              "amount_minor": 1250,
+              "currency": "USD",
+              "account": "acct-7781",
+              "reason": "duplicate charge"
+            }
+          }
+        }
+      }
+    }
+  }
+}

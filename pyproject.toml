@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling==1.29.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "requisition-aws"
+version = "0.1.0"
+description = "AWS demo adapters for Requisition (Strands hook, AgentCore Gateway REQUEST interceptor, offline check)."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Sudo Apt Holdings LLC (Script Kitty OS & Labs)" }]
+# the wheel carries the vendored ML-DSA verifier (CC0-1.0 OR 0BSD); everything else is Apache-2.0
+license = "Apache-2.0 AND (CC0-1.0 OR 0BSD)"
+license-files = ["LICENSE", "NOTICE", "bin/vendor/LICENSE.mldsa"]
+# core: the adapters (interceptor, target, gate) need only cryptography (Ed25519; keys.py) besides the
+# stdlib and the vendored ML-DSA verifier. boto/botocore belong to the Bedrock demo alone.
+dependencies = [
+    "cryptography>=46",
+]
+
+[project.optional-dependencies]
+strands = ["strands-agents", "botocore[crt]>=1.43.126"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["requisition_aws"]
+exclude = ["**/__pycache__"]
+
+# the vendored ML-DSA verifier and its licence travel inside the package (requisition_aws/pq.py loads it there)
+[tool.hatch.build.targets.wheel.force-include]
+"bin/vendor/mldsa.py" = "requisition_aws/_vendor/mldsa.py"
+"bin/vendor/LICENSE.mldsa" = "requisition_aws/_vendor/LICENSE.mldsa"
+
+[tool.hatch.build.targets.sdist]
+only-include = ["requisition_aws", "bin", "demo", "deploy", "tests", "pyproject.toml", "uv.lock", "README.md",
+                "LICENSE", "NOTICE", "THIRD-PARTY.md"]
+exclude = ["**/__pycache__"]
+
+[dependency-groups]
+dev = ["pytest", "strands-agents", "botocore[crt]>=1.43.126"]  # the demo (Bedrock) runs from the dev env
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

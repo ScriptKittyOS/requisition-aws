@@ -1,0 +1,20 @@
+{
+  "_comment": "AWS documented shape, fetched 2026-11-09, not a live Gateway. The HTTP-target REQUEST input example (base64 body); this interceptor does not serve HTTP targets. Authorization is a SigV4 header (G1: the deployed Gateway is AWS_IAM inbound; the documented example shows a bearer), changed 2026-11-10.",
+  "_source": [
+    "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-interceptors-types.html"
+  ],
+  "event": {
+    "interceptorInputVersion": "1.0",
+    "http": {
+      "gatewayRequest": {
+        "path": "/my-target-name/invocations",
+        "httpMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "AWS4-HMAC-SHA256 Credential=AKIAFIXTURENOTREAL01/20261109/us-west-2/bedrock-agentcore/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=FIXTURE-NOT-A-REAL-TOKEN"
+        },
+        "body": "eyJpbnB1dCI6ICJoZWxsbyJ9"
+      }
+    }
+  }
+}
