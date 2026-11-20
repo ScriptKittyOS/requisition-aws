@@ -4,7 +4,7 @@
 as given, with the co-signature beside the record; it FAILS with exit 6 on a checkpoint_ verdict, and on a pass that
 does not say every checkpoint check held; without the flags it hands on nothing new. The checks themselves are
 Requisition's verify_receipt.py's, run over the evaluation environment's vectors by Requisition's
-checkpoint_verifiers_parity_test.exs. Here bin/lab-verify is a stand-in that records what it was given and answers as
+own suite. Here bin/lab-verify is a stand-in that records what it was given and answers as
 told, so each part of this file is seen alone."""
 
 import json
@@ -17,7 +17,8 @@ from .conftest import ACT_TYPE
 
 HELD = "log checkpoint: all checks held: inclusion, witness quorum, not older than the held size"
 FLAGS = ["--checkpoint", "n", "--inclusion-proof", "p.json", "--witness-policy", "w", "--held-size", "3",
-         "--held-root", "r", "--consistency-proof", "c.json", "--key-transition", "t.json"]
+         "--held-root", "r", "--consistency-proof", "c.json", "--key-transition", "t.json",
+         "--held-to-transition-proof", "h.json"]
 
 STAND_IN = r'''
 import json, sys
@@ -95,3 +96,45 @@ def test_a_usage_error_in_the_checkpoint_inputs_is_exit_2(records, tmp_path):  #
     proc, _seen = _run(records, "allow", lab_verify, FLAGS)
     assert proc.returncode == 2, proc.stdout
     assert "verdict: FAIL (usage: the log checkpoint's inputs, as bin/lab-verify reports them above)" in proc.stdout
+
+
+# --- a co-signature is given by its flag or its member, whatever JSON value it holds ------------------------------
+# (a --cosignature file, or the member "cosignature" beside the record in a /v1 answer: null is a given co-signature of
+# the wrong form, like false, 0, true, [] and {}; only a flag or a member left out is "no co-signature")
+
+BARE = ["null", "false", "0", "true", "[]", "{}"]
+
+
+def _answer_with(paths, tmp_path, text):
+    decision = json.loads(paths["allow"].read_text())["decision"]
+    path = tmp_path / "answer.json"
+    path.write_text('{"decision": %s, "cosignature": %s}' % (json.dumps(decision), text))
+    return path
+
+
+def test_a_cosignature_given_as_any_bare_value_is_handed_on_as_given_under_the_checkpoint(records, tmp_path):  # noqa: F811
+    lab_verify = _stand_in(tmp_path, "lab checks.\n" + HELD + "\n\nverdict_code: lab_dev_key")
+    for text in BARE:
+        given = tmp_path / "cosig.json"
+        given.write_text(text)
+        _proc, seen = _run(records, "allow", lab_verify, FLAGS + ["--cosignature", str(given)])
+        assert "cosignature" in seen["record"] and seen["record"]["cosignature"] == json.loads(text), (text, seen["record"])
+        records["answer"] = _answer_with(records, tmp_path, text)
+        _proc, seen = _run(records, "answer", lab_verify, FLAGS)
+        assert "cosignature" in seen["record"] and seen["record"]["cosignature"] == json.loads(text), (text, seen["record"])
+
+
+def test_a_cosignature_given_as_null_is_refused_as_false_is_without_the_checkpoint(records, tmp_path):  # noqa: F811
+    lab_verify = _stand_in(tmp_path, "lab checks.\n\nverdict_code: lab_dev_key")
+    answers = {}
+    for text in BARE:
+        given = tmp_path / "cosig.json"
+        given.write_text(text)
+        flag, _seen = _run(records, "allow", lab_verify, ["--cosignature", str(given)])
+        records["answer"] = _answer_with(records, tmp_path, text)
+        member, _seen = _run(records, "answer", lab_verify, [])
+        for proc in (flag, member):
+            assert proc.returncode != 0 and "co-signature: not a four-field envelope" in proc.stdout, (text, proc.stdout)
+            assert "verdict: PASS" not in proc.stdout, (text, proc.stdout)
+        answers[text] = (flag.returncode, member.returncode)
+    assert len(set(answers.values())) == 1, answers

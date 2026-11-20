@@ -3,7 +3,7 @@
 """The KEY MATERIAL rule -- a public key is accepted only if it decodes canonically, is not
 small-order and [L]P is the identity (prime-order subgroup); a signature whose R is not a canonical point encoding or whose
 S >= L is refused -- in requisition_aws.keys (the gates), bin/verify_chain.py and (tests in requisition) bin/lab-verify and
-bin/lab-log-verify. The vectors are the shared file's ed25519_* sections, made by tools/gen_ed25519_vectors.py with
+Requisition's log checker. The vectors are the shared file's ed25519_* sections, made with
 independent arithmetic; the two ed25519_triples are the cases on which the deployed verifiers were MEASURED to disagree
 (OpenSSL reduces h mod L, the released verify_receipt.py (r4) uses the full h) -- with a mixed-order key refused, none can."""
 

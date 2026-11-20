@@ -41,8 +41,8 @@ Behaviour:
   written to the store (a conditional write) BEFORE the pass-through is returned; any later
   invocation that resolves to the same statement (a client reusing its JSON-RPC id, a Gateway
   retry, anything) is ``isError`` "this approval was already used; a new call needs a new approval".
-  Requisition answers an exact execute retry with the stored allow and no spend check
-  (``execute.ex:606-642``), so this mark is the only thing that stops a replay.
+  Requisition answers an exact execute retry with the stored allow and no spend check,
+  so this mark is the only thing that stops a replay.
 * malformed input, Requisition unreachable or any internal error: a JSON-RPC ``error`` with code
   ``FAIL_CLOSED`` (-31000, outside the JSON-RPC reserved range -32768..-32000, as MCP 2026-07-28
   basic/#error-codes asks of new codes). The JSON-RPC ``id`` is echoed.
@@ -124,7 +124,7 @@ import re
 import time
 from typing import Any, Callable
 
-from . import canonical, catalog, fence
+from . import canonical, catalog, fence, settings
 from .caller import JwtCaller, LegacySessionCaller, SigV4Caller, caller_session, header, header_values
 from .client import Client, RequisitionError, RequisitionRefused, RequisitionUnavailable, loads_strict, loads_tool_call
 from .gate import Gate, StaleExecute, arguments_object
@@ -552,30 +552,38 @@ def from_env(env: dict | None = None, credential_source: Callable[[], str] | Non
     REQUISITION_ALLOW_CLASSICAL_ONLY  "1": lift the key file's post-quantum policy (explicit; default "0")
     REQUISITION_REQUIRE_PQ      default "1": every record must carry a checked ML-DSA-87 signature
     REQUISITION_ALLOW_PLAINTEXT_PRIVATE  "1": plain http to a private IP literal (the VPC case)
+    REQUISITION_TIMEOUT         default 5: seconds per /v1 call
     REQUISITION_CRED_REREAD_SECONDS  default 60: at most one credential re-read per this many seconds
     ``credential_source``: re-reads the caller credential on caller_credential_expired (the deployed entry's)
+
+    The switches take exactly "1" or "0", the seconds a finite decimal above zero, REQUISITION_TOOLS strict JSON
+    (settings.py): any other value refuses to start, naming the variable, and never weakens a control.
     """
     env = dict(os.environ if env is None else env)
+    require_pq = settings.switch(env, "REQUISITION_REQUIRE_PQ", True)
+    allow_classical_only = settings.switch(env, "REQUISITION_ALLOW_CLASSICAL_ONLY", False)
+    allow_plaintext_private = settings.switch(env, "REQUISITION_ALLOW_PLAINTEXT_PRIVATE", False)
+    timeout = settings.seconds(env, "REQUISITION_TIMEOUT", 5)
+    reread_interval = settings.seconds(env, "REQUISITION_CRED_REREAD_SECONDS", 60)
+    tools = settings.json_map(env, "REQUISITION_TOOLS")
+    caller = caller_from_env(env)
     client = Client(env["REQUISITION_URL"], env["REQUISITION_CRED"], env["REQUISITION_PRINCIPAL"],
-                    timeout=float(env.get("REQUISITION_TIMEOUT", "5")),
-                    allow_plaintext_private=env.get("REQUISITION_ALLOW_PLAINTEXT_PRIVATE", "0") == "1")
+                    timeout=timeout, allow_plaintext_private=allow_plaintext_private)
     keys = KeyRegistry.from_env(env)  # required: KeyError refuses to start; re-read on change; signer kms by default
     store = Store(env.get("REQUISITION_STORE", "/tmp/requisition-aws/store.json"))
     gate = Gate(client, store, approval_base_url=env.get("REQUISITION_APPROVAL_BASE", env["REQUISITION_URL"]), keys=keys,
-                require_pq=env.get("REQUISITION_REQUIRE_PQ", "1") == "1",
-                allow_classical_only=env.get("REQUISITION_ALLOW_CLASSICAL_ONLY", "0") == "1")
-    registry = ToolRegistry.from_seed(env["REQUISITION_SEED"], json.loads(env["REQUISITION_TOOLS"]))
+                require_pq=require_pq, allow_classical_only=allow_classical_only)
+    registry = ToolRegistry.from_seed(env["REQUISITION_SEED"], tools)
     return Interceptor(gate, registry, gateway_id=env["REQUISITION_GATEWAY_ID"],
-                       agent_name=env.get("REQUISITION_AGENT", "agentcore-gateway"), caller=caller_from_env(env),
-                       credential_source=credential_source,
-                       reread_interval=float(env.get("REQUISITION_CRED_REREAD_SECONDS", "60")))
+                       agent_name=env.get("REQUISITION_AGENT", "agentcore-gateway"), caller=caller,
+                       credential_source=credential_source, reread_interval=reread_interval)
 
 
 def caller_from_env(env: dict) -> LegacySessionCaller | SigV4Caller | JwtCaller:
     """``REQUISITION_CALLER_SOURCE``: ``legacy_session`` (default), ``sigv4``, or ``jwt`` with
     ``REQUISITION_JWT_ISSUER``, ``REQUISITION_JWT_JWKS_FILE`` and ``REQUISITION_JWT_AUDIENCE`` and/or
     ``REQUISITION_JWT_CLIENTS`` (comma-separated). Anything else refuses to start."""
-    source = env.get("REQUISITION_CALLER_SOURCE", "legacy_session")
+    source = settings.choice(env, "REQUISITION_CALLER_SOURCE", CALLER_SOURCES, "legacy_session")
     if source == "legacy_session":
         return LegacySessionCaller()
     if source == "sigv4":
@@ -586,7 +594,7 @@ def caller_from_env(env: dict) -> LegacySessionCaller | SigV4Caller | JwtCaller:
         split = lambda v: tuple(x for x in (v or "").split(",") if x)  # noqa: E731
         return JwtCaller(env["REQUISITION_JWT_ISSUER"], jwks, audiences=split(env.get("REQUISITION_JWT_AUDIENCE")),
                          clients=split(env.get("REQUISITION_JWT_CLIENTS")))
-    raise ValueError(f"REQUISITION_CALLER_SOURCE must be one of {CALLER_SOURCES}")
+    raise AssertionError("unreachable: settings.choice admits only CALLER_SOURCES")
 
 
 def lambda_handler(event: Any, context: Any, credential_source: Callable[[], str] | None = None) -> dict:
@@ -595,7 +603,7 @@ def lambda_handler(event: Any, context: Any, credential_source: Callable[[], str
         if _INTERCEPTOR is None:
             _INTERCEPTOR = from_env(credential_source=credential_source)
     except Exception as error:  # noqa: BLE001 - misconfigured: refuse every call
-        log.error("requisition interceptor misconfigured: %s", type(error).__name__)
+        log.error("requisition interceptor misconfigured: %s", settings.log_reason(error))
         rpc_id = None
         try:
             rpc_id = event["mcp"]["gatewayRequest"]["body"].get("id")

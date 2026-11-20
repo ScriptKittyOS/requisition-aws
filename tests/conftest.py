@@ -58,7 +58,7 @@ def store(tmp_path, clock):
 @pytest.fixture
 def gate(client, store, clock, fake):
     keys = KeyRegistry.from_bytes(client.keys())
-    return Gate(client, store, approval_base_url="http://127.0.0.1:4103", keys=keys, clock=clock)
+    return Gate(client, store, approval_base_url="http://127.0.0.1:4000", keys=keys, clock=clock)
 
 
 @pytest.fixture

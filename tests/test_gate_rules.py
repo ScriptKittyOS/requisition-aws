@@ -157,14 +157,14 @@ def test_2_a_corrupted_signature_is_never_passed_through(fake, tmp_path, clock):
 
 
 @pytest.mark.parametrize("url, private_ok, allowed", [
-    ("http://127.0.0.1:4103", False, True),
-    ("http://localhost:4103", False, True),
-    ("http://[::1]:4103", False, True),
+    ("http://127.0.0.1:4000", False, True),
+    ("http://localhost:4000", False, True),
+    ("http://[::1]:4000", False, True),
     ("https://requisition.example.com", False, True),
-    ("http://8.8.8.8:4103", False, False),
+    ("http://8.8.8.8:4000", False, False),
     ("http://requisition.example.com", False, False),
-    ("http://10.0.4.7:4103", False, False),
-    ("http://10.0.4.7:4103", True, True),
+    ("http://10.0.4.7:4000", False, False),
+    ("http://10.0.4.7:4000", True, True),
     ("http://169.254.10.1", True, True),
     ("http://requisition.internal", True, False),  # a name could resolve anywhere: an IP literal only
     ("http://8.8.8.8", True, False),
@@ -179,9 +179,9 @@ def test_2_plaintext_only_to_loopback_or_an_allowed_private_address(url, private
 
 def test_2_the_interceptor_refuses_to_start_on_http_to_a_public_host(fake, tmp_path):
     with pytest.raises(ValueError, match="https"):
-        icp.from_env(env_for(fake, tmp_path, REQUISITION_URL="http://203.0.113.9:4103"))
-    it = icp.from_env(env_for(fake, tmp_path, REQUISITION_URL="http://10.1.2.3:4103", REQUISITION_ALLOW_PLAINTEXT_PRIVATE="1"))
-    assert it.gate.client.base_url == "http://10.1.2.3:4103"
+        icp.from_env(env_for(fake, tmp_path, REQUISITION_URL="http://203.0.113.9:4000"))
+    it = icp.from_env(env_for(fake, tmp_path, REQUISITION_URL="http://10.1.2.3:4000", REQUISITION_ALLOW_PLAINTEXT_PRIVATE="1"))
+    assert it.gate.client.base_url == "http://10.1.2.3:4000"
 
 
 # --- after the tool ran, never "did not run" --------------------------------------------
@@ -302,19 +302,21 @@ def test_6_an_exact_retry_after_revocation_is_superseded(gate, fake):
     assert err.value.code == "decision_superseded" and err.value.status == 409
 
 
-def test_7_the_demos_require_and_compare_the_key_file(fake, tmp_path, monkeypatch):
+def test_7_the_demos_require_and_compare_the_key_file(fake, tmp_path, monkeypatch, capsys):
     import importlib.util
 
     spec = importlib.util.spec_from_file_location("rtl", ROOT / "demo" / "run_target_local.py")
     rtl = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(rtl)
+    # the seed file is named, as an operator names it; it is not read before the key file is compared
     for k, v in {"REQUISITION_URL": fake.base_url, "REQUISITION_CRED": fake.credential,
-                 "REQUISITION_PRINCIPAL": fake.principal,
+                 "REQUISITION_PRINCIPAL": fake.principal, "REQUISITION_SEED": str(tmp_path / "seed.json"),
                  "REQUISITION_DEMO_DIR": str(tmp_path)}.items():
         monkeypatch.setenv(k, v)
     monkeypatch.delenv("REQUISITION_LAB_KEY_FILE", raising=False)
     with pytest.raises(SystemExit):
         rtl.main(["--transcript", str(tmp_path / "t.txt"), "--timeout", "0", "--poll", "0", "--no-require-pq"])
+    assert "set REQUISITION_LAB_KEY_FILE" in capsys.readouterr().err  # stopped for the key file, nothing else
     other = tmp_path / "other.json"
     other.write_text(json.dumps(FakeRequisition().registry))
     monkeypatch.setenv("REQUISITION_LAB_KEY_FILE", str(other))

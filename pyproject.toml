@@ -21,6 +21,11 @@ dependencies = [
 [project.optional-dependencies]
 strands = ["strands-agents", "botocore[crt]>=1.43.126"]
 
+[project.urls]
+Homepage = "https://github.com/ScriptKittyOS/requisition-aws"
+Repository = "https://github.com/ScriptKittyOS/requisition-aws"
+Issues = "https://github.com/ScriptKittyOS/requisition-aws/issues"
+
 [tool.hatch.build.targets.wheel]
 packages = ["requisition_aws"]
 exclude = ["**/__pycache__"]

@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
-"""The rollback demo's scratch server: it never
-compiles (the demo checkout's _build is shared with the live server); stop() returns only once the scratch
-server's port is closed and its process group is gone, with a bounded wait and a loud failure."""
+"""The rollback demo's scratch server: the demo holds no command for it (the operator gives the one Requisition's
+scratch-server script states, which never compiles); stop() returns only once the scratch server's port is closed
+and its process group is gone, with a bounded wait and a loud failure."""
 
 import socket
 import sys
@@ -17,9 +17,10 @@ from .test_rollback_guards import _free_port, scratch_env  # noqa: F401  (scratc
 from .test_rollback_demo import demo
 
 
-def test_d1_the_default_server_command_never_compiles():
-    assert "exec mix run --no-compile --no-deps-check --no-start " in demo.DEFAULT_SERVER_CMD
-    assert "mix compile" not in demo.DEFAULT_SERVER_CMD
+def test_d1_no_server_command_is_built_in(scratch_env, tmp_path):
+    assert not hasattr(demo, "DEFAULT_SERVER_CMD")
+    with pytest.raises(demo.Refused, match="name the command that starts Requisition's scratch server"):
+        demo.ScratchLab(source_db="demo_source", port=_free_port(), server_cmd="", out_dir=tmp_path, t=Transcript())
 
 
 def _port_open(port):
@@ -41,7 +42,7 @@ def _wrapper_and_slow_server(port, tmp_path):
         def slow(*_):
             time.sleep(2); s.close(); sys.exit(0)
         signal.signal(signal.SIGTERM, slow)
-        print("ROLLBACK SCRATCH SERVER UP on 127.0.0.1:{port}, database scratch_20261110120000_1_2, Oban queues and plugins off, pid 1", flush=True)
+        print("ROLLBACK SCRATCH SERVER UP on 127.0.0.1:{port}, database scratch_20261110120000_1_2, job queues off, pid 1", flush=True)
         while True:
             time.sleep(0.1)
     """))
@@ -57,7 +58,7 @@ def _wrapper_and_slow_server(port, tmp_path):
 
 def test_d2_stop_returns_only_once_the_port_is_closed(scratch_env, tmp_path):
     port = _free_port()
-    lab = demo.ScratchLab(source_db="autonomous_agency_aws_demo2", port=port,
+    lab = demo.ScratchLab(source_db="demo_source", port=port,
                           server_cmd=_wrapper_and_slow_server(port, tmp_path), out_dir=tmp_path, t=Transcript(),
                           start_timeout=20)
     lab.start()
@@ -72,8 +73,8 @@ def test_d2_stop_returns_only_once_the_port_is_closed(scratch_env, tmp_path):
 
 def test_d2_a_port_still_open_after_the_bounded_wait_is_a_loud_failure(scratch_env, tmp_path):
     port = _free_port()
-    up = f"ROLLBACK SCRATCH SERVER UP on 127.0.0.1:{port}, database scratch_20261110120000_1_2, Oban queues and plugins off, pid 1"
-    lab = demo.ScratchLab(source_db="autonomous_agency_aws_demo2", port=port,
+    up = f"ROLLBACK SCRATCH SERVER UP on 127.0.0.1:{port}, database scratch_20261110120000_1_2, job queues off, pid 1"
+    lab = demo.ScratchLab(source_db="demo_source", port=port,
                           server_cmd=f"{sys.executable} -c \"print({up!r}, flush=True); import time; time.sleep(30)\"",
                           out_dir=tmp_path, t=Transcript(), start_timeout=20, stop_timeout=1)
     lab.start()

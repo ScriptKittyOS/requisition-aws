@@ -59,7 +59,7 @@ def test_the_whole_demo_flow(gate, registry, fake, tmp_path):
     t.write(str(transcript))
     text = transcript.read_text()
     assert fake.credential not in text
-    assert "APPROVE AT   http://127.0.0.1:4103/approvals" in text
+    assert "APPROVE AT   http://127.0.0.1:4000/approvals" in text
     assert "signed verdict: deny statement_spent" in text
     assert text.count("verdict_code: lab_dev_key") == 3  # the statement, the allow, the spent deny
 
@@ -94,7 +94,7 @@ def test_the_whole_demo_flow_with_newer_routes_and_pq_required(tmp_path, clock):
     server.base_url = server.start()
     try:
         client = Client(server.base_url, server.credential, server.principal, timeout=5)
-        gate = Gate(client, Store(str(tmp_path / "s.json"), clock=clock), approval_base_url="http://127.0.0.1:4103",
+        gate = Gate(client, Store(str(tmp_path / "s.json"), clock=clock), approval_base_url="http://127.0.0.1:4000",
                     keys=KeyRegistry.from_bytes(client.keys()), clock=clock, require_pq=True)
         reg = ToolRegistry()
         reg.register(TOOL, ACT_TYPE, SEED_SCHEMA)
@@ -137,7 +137,7 @@ def test_the_target_flow(tmp_path, clock):
     server.base_url = server.start()
     try:
         client = Client(server.base_url, server.credential, server.principal, timeout=5)
-        gate = Gate(client, Store(str(tmp_path / "s.json"), clock=clock), approval_base_url="http://127.0.0.1:4103",
+        gate = Gate(client, Store(str(tmp_path / "s.json"), clock=clock), approval_base_url="http://127.0.0.1:4000",
                     keys=KeyRegistry.from_bytes(client.keys()), clock=clock)
         reg = ToolRegistry()
         reg.register("payments_refund_send", ACT_TYPE, SEED_SCHEMA)
@@ -146,7 +146,7 @@ def test_the_target_flow(tmp_path, clock):
                            agent_name="agentcore-gateway-demo", session="demo-target")
         records = capture_records(gate, ACT_TYPE)
         t = Transcript()
-        out = run_target_flow(target, ledger, refund_args(amount_minor=4200), t, approval_url="http://127.0.0.1:4103/approvals",
+        out = run_target_flow(target, ledger, refund_args(amount_minor=4200), t, approval_url="http://127.0.0.1:4000/approvals",
                               poll=0, timeout=30, sleep=lambda s: [server.approve(r) for r in list(server.requests)][:0])
         text = "\n".join(t.lines)
         assert out["ran"] and out["after_retry"] == 1 and out["final_ledger"] == 1, text

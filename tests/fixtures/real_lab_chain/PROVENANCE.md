@@ -39,12 +39,12 @@ df466a99d5df2dd49a8d21d8188a62ea2c4ad8050e0b79a46f279a425c21a6c1  dress-1/1-stra
 78886ce9e12e232b9f1c77efdf79578efe4911628cd23be2b4012f4590514375  dress-1/3-target/01-statement.record.json
 fb2f79591c90a61e1951f3bd229e9188fc04ee9fa5bf415111170e47c794c8c0  dress-1/3-target/02-decision.record.json
 28d5b2b112925f397a8781e8065aea67c54ded0ab49ffc5450f5e643dfc7b413  dress-1/3-target/03-outcome.record.json
-2354cd335f66eb6fefd9e5e54a8718e591bf4f69fa5f3c5603ac3d0a04535672  dress-1/lab-keys.json
+400b726903417291d6a8f3e83958fabc2b739b93b10d1b8908d2799f069e9a26  dress-1/lab-keys.json
 ca105a9b528c183c1aeeec7a492ff1a254783ae8099ccc76da8a3332c96b04ce  aws-instance/20261109T213617Z/statement.json
 c16fd706d6a5dbeed094a0f0f1f967abc741feed9251cebef540248fe49babc5  aws-instance/20261109T213617Z/v0-4.json
 e728a4fc8ff2962d27495e1bc1d9f328c58f0ab220319c17d9d8724597596b38  aws-instance/20261109T214355Z/statement.json
 42550ed29a12bb2a8e9b6734151d412686b72d498cad23a61c0ccea209355433  aws-instance/20261109T214355Z/v0-6.json
-95bab847014bd4f182f19a000879920861fd6b0146d908cf171184455ff76088  aws-instance/instance-lab-keys.json
+c6c4dee2a4afd176e6b53168ca6a33c8f237a24ea0bb9f06c6a9f4eab6759ea9  aws-instance/instance-lab-keys.json
 ```
 
 **Changed 2026-11-16: the two key files' notes.** In `dress-1/lab-keys.json` and
@@ -52,5 +52,9 @@ e728a4fc8ff2962d27495e1bc1d9f328c58f0ab220319c17d9d8724597596b38  aws-instance/2
 that prefix was removed. A key file's note is not signed and no check reads it; every other byte of both files is as
 saved (keys, fingerprints, windows, signers, statuses). Their sha256 above are of the changed files; the records are
 unchanged.
+
+**Changed 2026-11-19: the same notes again.** Each of those `note` members named the command of the issuing server
+that made the key; it now says "the evaluation environment's key command". Nothing else changed, and the sha256
+above are of the files as they are now.
 
 `tests/test_verify_chain.py` reads these read-only (it copies before any tamper).

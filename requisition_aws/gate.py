@@ -6,16 +6,16 @@ adapters turn that into "do not run the tool" (fail closed).
 
 What is checked, against Requisition's own record shapes:
 
-* a statement (``GET /v1/sanction-requests/:id``, ``sanction_requests.ex:497-517``, metadata
-  ``:366-386``): ``statement_id`` = ``receipt_hash`` = SHA-256 of ``signed_payload``; the signed
+* a statement (``GET /v1/sanction-requests/:id``):
+  ``statement_id`` = ``receipt_hash`` = SHA-256 of ``signed_payload``; the signed
   ``request_id``, ``principal``, ``act_type``, ``act_hash``, ``act_hash_alg`` and ``display_digest``
   are what the adapter proposed;
-* a decision (``POST /v1/execute``, ``execute.ex:554-596``, response ``:644-662``): ``receipt_hash``
+* a decision (``POST /v1/execute``): ``receipt_hash``
   = SHA-256 of ``signed_payload``; ``receipt_type`` ``requisition.lab.decision.v0``; the signed
   ``verdict`` and ``code`` equal the response's; the signed ``principal``, ``act_type``, ``act_hash``,
   ``act_hash_alg``, ``statement_id``, ``nonce`` and ``not_after`` equal the body sent; the signed
   ``display_projection_digest`` is the digest of the arguments; an allow carries ``exec_not_after``
-  (``execute.ex:601-605``) and the tool may run only before it;
+  and the tool may run only before it;
 * the signature of both (Ed25519, or ML-DSA-87 for the lab's post-quantum seat), when a pinned key
   file is given (``keys.KeyRegistry``);
 * the ML-DSA-87 co-signature, when the answer carries
@@ -64,8 +64,8 @@ from .client import (
 from .keys import KeyRegistry
 from .store import Store
 
-DECISION_TYPE = "requisition.lab.decision.v0"  # execute.ex:101
-STATEMENT_TYPE = "requisition.lab.statement.v0"  # sanction_requests.ex:77
+DECISION_TYPE = "requisition.lab.decision.v0"  # the receipt_type Requisition signs into a decision
+STATEMENT_TYPE = "requisition.lab.statement.v0"  # the receipt_type Requisition signs into a statement
 OUTCOME_TYPE = "requisition.lab.outcome.v0"  # the outcome record (not in the Requisition version of 2026-10-26)
 ENVELOPE = ("signature", "key_id", "signed_payload", "receipt_hash")
 # signed denies after which the statement can never allow again: the proposal leaves dedupe
@@ -121,7 +121,7 @@ class Decision:
 
 
 def arguments_object(agent: str, session: str, tool: str, tool_args: dict, tool_digest: str | None = None) -> dict:
-    """The arguments object of the demo's argument rows (lab/seed/aws_demo.v1.json):
+    """The arguments object of the demo's argument rows (Requisition's demo seed file, the set aws_demo):
     ``{agent, session, tool, args}``. ``tool`` holds the act type name (the seed's enum). A v2 row
     (G2) adds ``tool_digest``: the digest of the tool definition the call is made under."""
     out = {"agent": agent, "session": session, "tool": tool, "args": tool_args}
@@ -197,7 +197,7 @@ class Gate:
         require_pq: bool = False,
         allow_classical_only: bool = False,
     ):
-        if not 0 < not_after_seconds <= 300:  # execute.ex:102
+        if not 0 < not_after_seconds <= 300:  # Requisition's bound on not_after
             raise ValueError("not_after_seconds must be in (0, 300]")
         self.client = client
         self.store = store
@@ -219,8 +219,8 @@ class Gate:
         return dt.datetime.fromtimestamp(self.clock(), dt.timezone.utc)
 
     def approval_url(self, approval_id: str | None) -> str:
-        # GET /v1/sanction-requests/:id does not answer the approval request id while pending
-        # (sanction_requests.ex:492): until the statement exists, the link is the console's list.
+        # GET /v1/sanction-requests/:id does not answer the approval request id while pending:
+        # until the statement exists, the link is the console's list.
         return f"{self.approval_base_url}/approvals" + (f"/{approval_id}" if approval_id else "")
 
     # --- propose (deduplicated on act_hash) ----------------------------------------------
@@ -347,7 +347,7 @@ class Gate:
 
     def execute_fresh(self, sanction: Sanction, args: dict, nonce: str) -> Decision:
         """A second execute of the same statement under a NEW nonce (the demo's replay attempt).
-        Requisition answers a signed deny ``statement_spent`` (execute.ex:504-522)."""
+        Requisition answers a signed deny ``statement_spent``."""
         return self.execute(sanction, args, nonce)
 
     def _send(self, key: str, stored: dict, args: dict, *, replayed: bool) -> Decision:
@@ -495,6 +495,6 @@ class Gate:
                                                           "approval_request_id": None, **info})
 
     def runnable(self, decision: Decision) -> bool:
-        """An allow may be acted on only before its signed exec_not_after (execute.ex:601-605)."""
+        """An allow may be acted on only before its signed exec_not_after."""
         until = parse_instant(decision.exec_not_after)
         return decision.allowed and until is not None and self.now() < until

@@ -33,7 +33,7 @@ CLIENT_META = {"io.modelcontextprotocol/protocolVersion": MODERN,
 
 def make_target(server, tmp_path, clock, *, tools=None, keys=True, **kw):
     client = Client(server.base_url, server.credential, server.principal, timeout=5)
-    gate = Gate(client, Store(str(tmp_path / "store.json"), clock=clock), approval_base_url="http://127.0.0.1:4103",
+    gate = Gate(client, Store(str(tmp_path / "store.json"), clock=clock), approval_base_url="http://127.0.0.1:4000",
                 keys=KeyRegistry.from_bytes(client.keys()) if keys else None, clock=clock)
     reg = ToolRegistry()
     reg.register(TOOL, ACT_TYPE, SEED_SCHEMA)

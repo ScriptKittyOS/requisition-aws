@@ -8,8 +8,8 @@ its Nth read (the console's two approvals, simulated).
     uv run python -m tests.fake_server_main --env-out DIR/env.sh --keys-out DIR/lab-keys.json \
         [--seed FILE] [--newer-routes] [--cosign signed|seat_absent] [--auto-approve-after 2]
 
---seed defaults to $REQUISITION_DEMO_DIR/req/lab/seed/aws_demo.v1.json, the file demo/run_demo.py
-reads by default; with neither, it stops (exit 2).
+--seed defaults to $REQUISITION_SEED, the file the demos read; with neither, it stops (exit 2). This repository's
+own copy of the demo seed is tests/fixtures/seed/aws_demo.v1.json.
 """
 
 import argparse
@@ -24,23 +24,19 @@ from requisition_aws import canonical
 
 from .fake_requisition import FakeRequisition
 
-SEED_UNDER_DEMO_DIR = ("req", "lab", "seed", "aws_demo.v1.json")
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--env-out", required=True)
     ap.add_argument("--keys-out", required=True)
-    ap.add_argument("--seed", default=None, help="default: under REQUISITION_DEMO_DIR")
+    ap.add_argument("--seed", default=None, help="the seed file; or REQUISITION_SEED (no default)")
     ap.add_argument("--newer-routes", action="store_true")
     ap.add_argument("--cosign", default=None)
     ap.add_argument("--auto-approve-after", type=int, default=2)
     a = ap.parse_args()
     if a.seed is None:
-        demo = os.environ.get("REQUISITION_DEMO_DIR", "")
-        if not demo:
-            ap.error("pass --seed, or set REQUISITION_DEMO_DIR to the demo folder")
-        a.seed = os.path.join(demo, *SEED_UNDER_DEMO_DIR)
+        a.seed = os.environ.get("REQUISITION_SEED", "")
+        if not a.seed:
+            ap.error("pass --seed, or set REQUISITION_SEED to the seed file")
     with open(a.seed) as handle:
         rows = json.load(handle)["act_types"]
     act_types = {r["registration"]["name"]: canonical.ArgsSchema(r["registration"]["display_schema"]) for r in rows}

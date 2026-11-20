@@ -3,7 +3,7 @@
 """ONE written rule for a retired, revoked or foreign-signer
 key, run against every verifier in this repository with ONE shared vector file.
 
-The rule (requisition lib/autonomous_agency/authority/execute_api/lab_key_rule.ex is its text): for a record whose
+The rule (the issuing server's key rule is its text): for a record whose
 signed ``occurred_at`` is T and a key entry E, in this order --
   1. E.status is ``compromised`` or ``revoked``                    -> key_revoked   (earlier records too: no
                                                                       verifier here holds the log binding)
@@ -39,8 +39,8 @@ ALGORITHMS = ["ed25519", "mldsa87"]
 
 
 def test_the_vector_file_is_the_pinned_copy():
-    """The pin. That the file is a byte copy of Requisition's lab/requisition_key_rule_vectors.v1.json is checked in
-    Requisition's suite (test/bin_scripts/requisition_aws_drift_test.exs)."""
+    """The pin. That the file is a byte copy of Requisition's key-rule vector file is checked in
+    Requisition's suite."""
     assert hashlib.sha256(H.VECTOR_FILE.read_bytes()).hexdigest() == VECTORS_SHA256
 
 
@@ -120,8 +120,8 @@ MATERIAL = {"_P", "_L", "_D", "_SQRT_M1", "_IDENTITY", "_decode_canonical_point"
 
 
 def _req_tools():
-    """Requisition's bin/lab-verify as committed here; its bin/lab-log-verify, and its live bin/lab-verify, are
-    compared with these texts in Requisition's suite (test/bin_scripts/requisition_aws_drift_test.exs)."""
+    """Requisition's bin/lab-verify as committed here; its log checker, and its live bin/lab-verify, are
+    compared with these texts in Requisition's suite."""
     return [LAB_VERIFY]
 
 
@@ -154,7 +154,7 @@ def test_a_signer_that_is_a_list_or_an_object_is_not_accepted_and_raises_nothing
 
 def test_the_ed25519_key_material_rule_is_one_text_in_every_python_verifier():
     """keys.py is the original (prime-order keys, canonical R and S < L); verify_chain.py, bin/lab-verify and
-    bin/lab-log-verify carry the same text."""
+    Requisition's log checker carry the same text."""
     original = _sources(ROOT / "requisition_aws" / "keys.py", MATERIAL)
     assert len(original) == 10
     for tool in [CHAIN] + _req_tools():

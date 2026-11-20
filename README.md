@@ -37,8 +37,8 @@ listed in `THIRD-PARTY.md`.
 | `demo/run_airgap.py` | Re-checks a finished run's records in `docker run --rm --network none` after a network probe, then shows a one-character change FAIL. |
 | `requisition_aws/fence.py` | **F1, the relying party's own memory.** Every signed record a form reads (statement, decision, outcome) is remembered by its signed `(chain_scope, sequence)`; a different record at a held position is refused `authority_equivocated` and both are kept as evidence. Before acting on an allow, every form claims the statement **and** the `approval_request_id` it names, so a re-minted statement for an approval already acted on is refused `approval_already_used`. `Store.admit` does all of it in one transaction, persisted before the effect. No ordering rule: the lab's chain is the whole account's, so gaps are normal. |
 | `bin/verify_chain.py` | **F1b, a stranger's offline check** of one account chain export against held records (a relying party's position memory or evidence): `link_broken`, `sequence_gap`, `sequence_duplicate`, `export_not_from_genesis`, `held_record_differs`, `export_short`, `equivocation`, `signature_invalid`, `held_record_invalid`, `held_other_scope`, `pq_missing`. Stdlib plus two pinned vendored files: the Ed25519 routine copied from Requisition's `verify_receipt.py`, and `mldsa.py`. Active keys only: a chain with records under a rotated key FAILs `signature_invalid` for them. It judges the export it is given, not the live service. |
-| `bin/export_chain.sh` | The read-only SQL export of one account chain (`psql`, a READ ONLY transaction, `COPY (SELECT ... ORDER BY sequence) TO STDOUT` as CSV; the scope only as a `psql` variable). Point it at a `bin/scratch-db` copy or the demo database. |
-| `demo/run_rollback_local.py` | **The rollback demo, local only.** It runs inside Requisition's `bin/scratch-db` (a database created for the run and dropped after it) on a copy of the demo database, with a second server on another port (`demo/rollback/serve_scratch.exs`). The refund runs once; the database is restored to before the mint; the restored service re-mints and would allow again; the target refuses `authority_equivocated`; `verify_chain.py` FAILs the restored export. `--dry-run` checks the copy and the restore round trip without a server. Its claim, word for word: "If Requisition's database is rolled back, the same executor, with its own records intact, refuses to act again, and the rollback leaves two different records signed by the service's key at one chain position, which anyone can check offline. Lab profile, lab key. (when nothing was appended between the snapshot and the mint; step 7 checks this and stops otherwise)." |
+| `bin/export_chain.sh` | The read-only SQL export of one account chain (`psql`, a READ ONLY transaction, `COPY (SELECT ... ORDER BY sequence) TO STDOUT` as CSV; the scope only as a `psql` variable). Point it at a copy made by Requisition's scratch-database wrapper, or at the demo database. |
+| `demo/run_rollback_local.py` | **The rollback demo, local only.** It runs inside Requisition's scratch-database wrapper (a database created for the run and dropped after it) on a copy of the demo database, with a second server on another port, started with the command the operator gives (`--server-cmd`, or `ROLLBACK_SERVER_CMD`; Requisition's scratch-server script states it). The source database (`--source-db`), the live server's port (`--live-port`, or the port of `REQUISITION_URL`) and the seed file (`--seed`, or `REQUISITION_SEED`) are given by the operator too; the demo holds no name of a database or a server, no command of the server and no place inside its checkout. The refund runs once; the database is restored to before the mint; the restored service re-mints and would allow again; the target refuses `authority_equivocated`; `verify_chain.py` FAILs the restored export. `--dry-run` checks the copy and the restore round trip without a server. Its claim, word for word: "If Requisition's database is rolled back, the same executor, with its own records intact, refuses to act again, and the rollback leaves two different records signed by the service's key at one chain position, which anyone can check offline. Lab profile, lab key. (when nothing was appended between the snapshot and the mint; step 7 checks this and stops otherwise)." |
 | `demo/rehearse.sh` | The one-command dress rehearsal: the Strands demo, the interceptor, the target, then the airgap check. Each step prints a short transcript through `demo/present.py`, with credentials elided. `REHEARSE_DRY=1` runs all four against a local fake. |
 
 ## Install
@@ -103,17 +103,19 @@ plain `elixir -pa`, so no app started and no database was opened.
 
 ## Running the demo
 
-Preconditions are on the demo database (`autonomous_agency_aws_demo`, server on `127.0.0.1:4103`):
+Preconditions, on the Requisition server the demo talks to (`REQUISITION_URL`):
 
-1. `payments.refund_send` is registered from `lab/seed/aws_demo.v1.json`.
+1. `payments.refund_send` is registered from Requisition's demo seed file, the set `aws_demo` (this repository's
+   copy of it is `tests/fixtures/seed/aws_demo.v1.json`).
 2. A caller grant covers that act type at class `high` or above, with scope `propose_execute`.
 3. You have that grant's credential and principal.
 
 ```sh
 cd requisition-aws
 export REQUISITION_DEMO_DIR=/path/to/demo     # required: req/ is a Requisition checkout; transcripts go to log/
+export REQUISITION_SEED=/path/to/seed.json    # required: the seed file the server registered the act type from
 # export REQUISITION_LOAD_WRAPPER=/path/to/cmd # optional: a command placed before docker (--airgap)
-export REQUISITION_URL=http://127.0.0.1:4103
+export REQUISITION_URL=http://127.0.0.1:4000   # your Requisition server
 export REQUISITION_CRED='rqc_...'        # never printed; elided from the transcript
 export REQUISITION_PRINCIPAL='rqp_...'
 # export REQUISITION_SOCKET=/path.sock   # only if the server runs with REQUISITION_LAB_SOCKET=true
@@ -129,7 +131,7 @@ What each mode uses:
   profile named by `AWS_PROFILE` (boto3's default chain when unset), with synthetic prompts only.
 - **`--scripted`** calls no model. It drives the same hook path, with the same interrupt and resume.
 
-When the agent's tool call is held, the run prints `APPROVE AT http://127.0.0.1:4103/approvals`. Two
+When the agent's tool call is held, the run prints `APPROVE AT <REQUISITION_URL>/approvals`. Two
 approver accounts approve in the console. The app polls `GET /v1/sanction-requests/<id>`, resumes,
 and the stub prints `REFUND SENT` only on a signed allow. The run then executes the same statement
 under a fresh nonce, which is a signed deny `statement_spent`. Finally it checks every record
@@ -138,8 +140,8 @@ offline. Records, the pinned `GET /v1/keys` file and the store go to `<transcrip
 Check before the live run:
 
 - **Time limits.** The statement expires 300 s after the second approval. A row with
-  `sanctioners_required >= 2` takes the first time line (`vocabulary.ex:40`, `:86-87`). An allow's
-  `exec_not_after` is at most 60 s after the decision (`execute.ex:601-605`).
+  `sanctioners_required >= 2` takes the first time line. An allow's
+  `exec_not_after` is at most 60 s after the decision.
 - **The key file.** `cmp <records>/lab-keys.json "$REQUISITION_LAB_KEY_FILE"` must report the same
   bytes.
 - **The model.** Whether gpt-oss calls tools through Strands' Bedrock provider is unverified.
@@ -151,7 +153,9 @@ Check before the live run:
 ```sh
 export REQUISITION_DEMO_DIR=/path/to/demo     # as above; REQUISITION_LOAD_WRAPPER too, if you use one
 # required: demo/rehearse.sh has no default and stops without it
-export REQUISITION_URL=http://127.0.0.1:4103 REQUISITION_CRED='rqc_...' REQUISITION_PRINCIPAL='rqp_...'
+export REQUISITION_SEED=/path/to/seed.json    # as above, required too; a dry run (REHEARSE_DRY=1) reads this
+                                              # repository's copy when it is unset
+export REQUISITION_URL=http://127.0.0.1:4000 REQUISITION_CRED='rqc_...' REQUISITION_PRINCIPAL='rqp_...'
 export REQUISITION_LAB_KEY_FILE=...   # required: steps 1 and 3 refuse unless GET /v1/keys serves these bytes;
                                       # step 2 checks every signature against this file
 demo/rehearse.sh                      # STRANDS_MODE=scripted to skip Bedrock
@@ -199,7 +203,18 @@ The tool runs **only** on a checked allow, before its `exec_not_after`, and **at
 | `REQUISITION_APPROVAL_BASE` | The console base URL used in approval links. |
 | `REQUISITION_KEYS_FILE` | **Required.** The pinned lab key file. Without it the handler refuses every call. Every statement and decision signature is checked against it, and an allow whose signature was not checked is never passed through. |
 | `REQUISITION_REQUIRE_PQ` | Default `1`: every record must carry an ML-DSA-87 signature checked here (the record's own, or its co-signature). Set `0` only against a server without co-signatures. |
-| `REQUISITION_ALLOW_PLAINTEXT_PRIVATE` | `1` allows `http://` to a private or link-local IP literal (the VPC case). Otherwise `REQUISITION_URL` must be `https`, unless the host is loopback. |
+| `REQUISITION_ALLOW_CLASSICAL_ONLY` | `1` or `0`; unset means `0`. `1` lifts the post-quantum policy of the evaluation environment's pinned key file. |
+| `REQUISITION_ALLOW_PLAINTEXT_PRIVATE` | `1` or `0`; unset means `0`. `1` allows `http://` to a private or link-local IP literal (the VPC case). Otherwise `REQUISITION_URL` must be `https`, unless the host is loopback. |
+| `REQUISITION_TIMEOUT`, `REQUISITION_KEYS_MAX_AGE_SECONDS`, `REQUISITION_CRED_REREAD_SECONDS` | Seconds, written in decimal digits with an optional fraction (`5`, `0.5`), above zero and at most 86400 (one day). Unset means 5, 300 and 60. |
+| `REQUISITION_PRINCIPAL_EXPECTED` | **Required by the deployed Lambda entry** (`deploy/lambda/interceptor_entry.py`): the principal id the caller secret must name, `rqp_` and 32 lower-case hex digits. Unset, empty or in any other form, every request is refused before the secret is read. A stack template must pass a principal id here: an empty default refuses every call. |
+
+**Accepted values only.** The switches above take exactly `1` or `0`; unset, `REQUISITION_REQUIRE_PQ` means `1`
+and the other two mean `0`. Any other value refuses to start and names the variable; that includes `true`, `yes`,
+`on`, an upper-case word, a padded ` 1` and the empty string. A wrong spelling never falls back to the weaker
+setting. The same holds for the seconds and for `REQUISITION_TOOLS`, which is read as strict JSON (a tool named
+twice is refused). On the target, `REQUISITION_SESSION_HEADER` and `REQUISITION_CALLER_HEADER` must be HTTP header
+names when they are set, and `MCP_HOST` must be a host name or an IP literal (unset: `127.0.0.1`); set and empty is
+refused. The deployed forms log the refused variable and what it accepts, never its value.
 
 The interceptor needs `passRequestHeaders: true`. Without the caller's header (`Mcp-Session-Id` under
 `legacy_session`, `Authorization` under `sigv4` or `jwt`), it refuses every `tools/call` with
@@ -247,7 +262,7 @@ The fixtures under `tests/fixtures/interceptor/` are each labelled "AWS document
     through. Any later invocation that resolves to the same statement is refused with "this approval
     was already used; a new call needs a new approval": a client reusing its JSON-RPC id, a Gateway
     retry, anything. Requisition answers an exact execute retry with the stored allow and no spend
-    check (`execute.ex:606-642`), so this mark is what stops a replay.
+    check, so this mark is what stops a replay.
   - **A Gateway retry after a timed-out first pass-through is therefore refused** (fail closed). The
     approval may be lost and the agent must file again. Only the target form binds the spend to the
     effect.
@@ -279,5 +294,5 @@ The fixtures under `tests/fixtures/interceptor/` are each labelled "AWS document
 - **The ML-DSA-87 check.** The vendored verifier checks only ML-DSA-87, pure, with an empty context. Both of
   the lab's keys are dev keys, not trust roots.
 - **The approval link.** `GET /v1/sanction-requests/:id` does not return the approval request id
-  while a request is pending (`sanction_requests.ex:492`). Until the statement exists, the link is
+  while a request is pending. Until the statement exists, the link is
   the console's `/approvals` list.

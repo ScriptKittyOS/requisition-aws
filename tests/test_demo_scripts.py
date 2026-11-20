@@ -89,7 +89,8 @@ def _rehearse_with_a_recording_uv(tmp_path, **extra_env):
     env = {k: v for k, v in os.environ.items() if k not in ("REQUISITION_DEMO_DIR", "REQUISITION_LOAD_WRAPPER", "REHEARSE_DRY")}
     env.update(PATH=f"{bindir}:{env['PATH']}", OUT=str(out), STEPS="1 2 3 4", STRANDS_MODE="scripted",
                REQUISITION_URL="http://127.0.0.1:9", REQUISITION_CRED="x", REQUISITION_PRINCIPAL="y",
-               REQUISITION_LAB_KEY_FILE=str(tmp_path / "keys.json"), **extra_env)
+               REQUISITION_LAB_KEY_FILE=str(tmp_path / "keys.json"), REQUISITION_SEED=str(tmp_path / "seed.json"))
+    env.update(extra_env)
     proc = subprocess.run(["bash", str(ROOT / "demo" / "rehearse.sh")], capture_output=True, text=True, env=env, timeout=120)
     calls = [line.split("|", 1) for line in log.read_text().splitlines()] if log.exists() else []
     return calls, proc
@@ -112,13 +113,56 @@ def test_rehearse_sh_gives_every_demo_the_scratch_folder_the_caller_set(tmp_path
     assert len(calls) == 4 and {folder for folder, _ in calls} == {mine}, calls
 
 
-def test_the_dry_run_fake_needs_a_seed_or_the_scratch_folder(tmp_path):
-    env = {k: v for k, v in os.environ.items() if k != "REQUISITION_DEMO_DIR"}
+def test_the_dry_run_fake_needs_a_seed(tmp_path):
+    # no place inside a Requisition checkout is built in: with the demo folder set and no seed named, it stops
+    env = {k: v for k, v in os.environ.items() if k != "REQUISITION_SEED"}
+    env["REQUISITION_DEMO_DIR"] = str(tmp_path)
     proc = subprocess.run([sys.executable, "-m", "tests.fake_server_main", "--env-out", str(tmp_path / "env.sh"),
                            "--keys-out", str(tmp_path / "keys.json")], capture_output=True, text=True, env=env,
                           cwd=ROOT, timeout=120)
-    assert proc.returncode == 2 and "REQUISITION_DEMO_DIR" in proc.stderr, (proc.returncode, proc.stderr[-300:])
+    assert proc.returncode == 2 and "REQUISITION_SEED" in proc.stderr, (proc.returncode, proc.stderr[-300:])
     assert not (tmp_path / "env.sh").exists()
+
+
+def test_a_demo_is_told_its_seed_file(monkeypatch, capsys):
+    from requisition_aws import demo_flow
+    monkeypatch.setenv("REQUISITION_SEED", "from-the-environment.json")
+    assert demo_flow.demo_seed("given.json") == "given.json"
+    assert demo_flow.demo_seed(None) == "from-the-environment.json"
+    monkeypatch.delenv("REQUISITION_SEED")
+    with pytest.raises(SystemExit) as stopped:
+        demo_flow.demo_seed(None)
+    assert stopped.value.code == 2 and "REQUISITION_SEED" in capsys.readouterr().err
+
+
+def test_no_demo_holds_a_place_inside_a_requisition_checkout_for_its_seed():
+    for name in ["demo/run_demo.py", "demo/run_interceptor_local.py", "demo/run_target_local.py",
+                 "demo/run_rollback_local.py", "tests/fake_server_main.py"]:
+        text = (ROOT / name).read_text()
+        assert '"seed" /' not in text and '"seed", "' not in text, name
+
+
+def test_rehearse_sh_without_a_seed_stops_before_any_demo(tmp_path):
+    calls, proc = _rehearse_with_a_recording_uv(tmp_path, REQUISITION_DEMO_DIR=str(tmp_path / "mine"), REQUISITION_SEED="")
+    assert proc.returncode != 0 and calls == [], (proc.returncode, calls)
+    assert "REQUISITION_SEED" in proc.stderr, proc.stderr[-300:]
+
+
+def test_a_dry_rehearsal_reads_this_repositorys_copy_of_the_seed(tmp_path):
+    # REHEARSE_DRY=1 with no seed named: the fake and the demos get tests/fixtures/seed/aws_demo.v1.json
+    bindir, log, out = tmp_path / "bin", tmp_path / "uv-calls.txt", tmp_path / "out"
+    bindir.mkdir()
+    stub = bindir / "uv"
+    stub.write_text('#!/usr/bin/env bash\nprintf "%s|%s\\n" "${REQUISITION_SEED-UNSET}" "$*" >> "' + str(log) + '"\n'
+                    'while [ $# -gt 1 ]; do [ "$1" = --env-out ] && echo true > "$2"; shift; done\n')
+    stub.chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if k not in ("REQUISITION_SEED", "REQUISITION_LOAD_WRAPPER")}
+    env.update(PATH=f"{bindir}:{env['PATH']}", OUT=str(out), STEPS="1", REHEARSE_DRY="1", REQUISITION_DEMO_DIR=str(tmp_path),
+               REQUISITION_URL="http://127.0.0.1:9", REQUISITION_CRED="x", REQUISITION_PRINCIPAL="y",
+               REQUISITION_LAB_KEY_FILE=str(tmp_path / "keys.json"))
+    subprocess.run(["bash", str(ROOT / "demo" / "rehearse.sh")], capture_output=True, text=True, env=env, timeout=120)
+    seeds = {line.split("|", 1)[0] for line in log.read_text().splitlines()}
+    assert seeds == {str(ROOT / "tests" / "fixtures" / "seed" / "aws_demo.v1.json")}, seeds
 
 
 @pytest.mark.parametrize("name", REHEARSED + ["run_rollback_local.py"])
@@ -127,6 +171,16 @@ def test_a_demo_prints_its_help_without_the_scratch_folder(name):
     proc = subprocess.run([sys.executable, str(ROOT / "demo" / name), "--help"], capture_output=True, text=True,
                           env=env, cwd=ROOT, timeout=120)
     assert proc.returncode == 0 and "usage" in proc.stdout.lower(), (proc.returncode, proc.stderr[-300:])
+
+
+def test_the_interceptor_demo_prints_the_approval_link_the_interceptor_uses():
+    # the interceptor's own links use REQUISITION_APPROVAL_BASE when it is set (requisition_aws.interceptor.from_env)
+    spec = importlib.util.spec_from_file_location("run_interceptor_local", ROOT / "demo" / "run_interceptor_local.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    url = {"REQUISITION_URL": "http://127.0.0.1:4000/"}
+    assert mod.approvals_link(url) == "http://127.0.0.1:4000/approvals"
+    assert mod.approvals_link({**url, "REQUISITION_APPROVAL_BASE": "https://console.example/"}) == "https://console.example/approvals"
 
 
 def test_run_airgap_keeps_an_empty_wrapper_and_defaults_an_absent_one(tmp_path, monkeypatch):

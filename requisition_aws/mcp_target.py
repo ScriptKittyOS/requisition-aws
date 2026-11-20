@@ -93,7 +93,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 
-from . import canonical
+from . import canonical, settings
 from .caller import caller_session
 from .client import MAX_INTEGER, Client, RequisitionError, RequisitionUnavailable, loads_tool_call
 from .gate import Decision, Gate, StaleExecute, arguments_object
@@ -579,17 +579,29 @@ def from_env(env: dict | None = None) -> tuple[McpTarget, dict]:
     REQUISITION_ALLOW_CLASSICAL_ONLY  "1": lift the key file's post-quantum policy (explicit; default "0")
     REQUISITION_REQUIRE_PQ  default "1": run only on records whose ML-DSA-87 signature was checked
     REQUISITION_ALLOW_PLAINTEXT_PRIVATE  "1": plain http to a private IP literal (the VPC case)
-    MCP_HOST, MCP_PORT, MCP_PATH, MCP_ALLOWED_ORIGINS (comma-separated)"""
+    REQUISITION_TIMEOUT     default 5: seconds per /v1 call
+    MCP_HOST                a host name or an IP literal (default 127.0.0.1; set and empty is refused)
+    MCP_PORT, MCP_PATH, MCP_ALLOWED_ORIGINS (comma-separated)
+
+    The switches take exactly "1" or "0", the seconds a finite decimal above zero, a header setting an HTTP header
+    name when it is set, REQUISITION_TOOLS strict JSON (settings.py): any other value refuses to start, naming the
+    variable, and never weakens a control."""
     env = dict(os.environ if env is None else env)
+    require_pq = settings.switch(env, "REQUISITION_REQUIRE_PQ", True)
+    allow_classical_only = settings.switch(env, "REQUISITION_ALLOW_CLASSICAL_ONLY", False)
+    allow_plaintext_private = settings.switch(env, "REQUISITION_ALLOW_PLAINTEXT_PRIVATE", False)
+    timeout = settings.seconds(env, "REQUISITION_TIMEOUT", 5)
+    session_header = settings.header_name(env, "REQUISITION_SESSION_HEADER")
+    caller_header = settings.header_name(env, "REQUISITION_CALLER_HEADER")
+    bind_host = settings.host(env, "MCP_HOST", "127.0.0.1")
+    tools_map = settings.json_map(env, "REQUISITION_TOOLS", '{"payments_refund_send": "payments.refund_send"}')
     client = Client(env["REQUISITION_URL"], env["REQUISITION_CRED"], env["REQUISITION_PRINCIPAL"],
-                    timeout=float(env.get("REQUISITION_TIMEOUT", "5")), unix_socket=env.get("REQUISITION_SOCKET") or None,
-                    allow_plaintext_private=env.get("REQUISITION_ALLOW_PLAINTEXT_PRIVATE", "0") == "1")
+                    timeout=timeout, unix_socket=env.get("REQUISITION_SOCKET") or None,
+                    allow_plaintext_private=allow_plaintext_private)
     keys = KeyRegistry.from_env(env)  # required: KeyError refuses to start; re-read on change; signer kms by default
     store = Store(env.get("REQUISITION_STORE", "/tmp/requisition-aws/target-store.json"))
     gate = Gate(client, store, approval_base_url=env.get("REQUISITION_APPROVAL_BASE", env["REQUISITION_URL"]), keys=keys,
-                require_pq=env.get("REQUISITION_REQUIRE_PQ", "1") == "1",
-                allow_classical_only=env.get("REQUISITION_ALLOW_CLASSICAL_ONLY", "0") == "1")
-    tools_map = json.loads(env.get("REQUISITION_TOOLS", '{"payments_refund_send": "payments.refund_send"}'))
+                require_pq=require_pq, allow_classical_only=allow_classical_only)
     registry = ToolRegistry.from_seed(env["REQUISITION_SEED"], tools_map)
     ledger = Ledger(env.get("REQUISITION_LEDGER", "/tmp/requisition-aws/refund-ledger.jsonl"))
     if set(tools_map) != {"payments_refund_send"}:
@@ -598,10 +610,9 @@ def from_env(env: dict | None = None) -> tuple[McpTarget, dict]:
                        target_id=env.get("REQUISITION_TARGET_ID", "requisition-target-local"),
                        agent_name=env.get("REQUISITION_AGENT", "agentcore-gateway"),
                        session=env.get("REQUISITION_SESSION", "agentcore-gateway"),
-                       session_header=env.get("REQUISITION_SESSION_HEADER") or None,
-                       caller_header=env.get("REQUISITION_CALLER_HEADER") or None,
+                       session_header=session_header, caller_header=caller_header,
                        allowed_origins=tuple(o for o in env.get("MCP_ALLOWED_ORIGINS", "").split(",") if o))
-    opts = {"host": env.get("MCP_HOST", "127.0.0.1"), "port": int(env.get("MCP_PORT", "8000")),
+    opts = {"host": bind_host, "port": int(env.get("MCP_PORT", "8000")),
             "mcp_path": env.get("MCP_PATH", "/mcp")}
     return target, opts
 

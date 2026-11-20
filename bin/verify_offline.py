@@ -4,9 +4,10 @@
 """verify_offline.py -- tie a Requisition lab record to the arguments the approvers were shown.
 
     python3 -I bin/verify_offline.py --arguments ARGS.json --act-type NAME --record RECORD.json \
-        --lab-verify /path/to/requisition/bin/lab-verify --registry LAB-KEYS.json \
+        --lab-verify /path/to/bin/lab-verify --registry LAB-KEYS.json \
         [--checkpoint NOTE --inclusion-proof PROOF.json --witness-policy POLICY [--held-size N --held-root ROOT |
-         --held-state FILE [--write-held-state]] [--consistency-proof PROOF.json] [--key-transition RECORD.json]]
+         --held-state FILE [--write-held-state]] [--consistency-proof PROOF.json]
+         [--key-transition RECORD.json [--held-to-transition-proof PROOF.json]]]
 
 ARGS.json   the arguments object exactly as shown to the approvers (for the AWS demo's argument
             rows: {"agent", "session", "tool", "args": {...}}).
@@ -14,13 +15,15 @@ NAME        the act type (e.g. payments.refund_send).
 RECORD.json a lab record: the four-field envelope {signature, key_id, signed_payload, receipt_hash},
             or a /v1 answer carrying one under "statement" (GET /v1/sanction-requests/:id) or
             "decision" (POST /v1/execute).
+--at TIME   optional: one instant, YYYY-MM-DDTHH:MM:SSZ; the answer then says whether the record's window was
+            open at it (WHAT A PASS SAYS, below).
 
 Two independent halves, both reported:
 
  1. THE BINDING (this file). It recomputes act_hash = lower-case hex SHA-384 of CanonicalPayload v3
-    over ARGS with "act_type" put inside (Requisition's ActHash.derive/3; label
+    over ARGS with "act_type" put inside (Requisition's act hash; label
     sha384+canonical_payload.v3) and the arguments digest = SHA-256 of CanonicalPayload v3 over ARGS
-    (Requisition's Effector.encode/2), and compares them with the SIGNED bytes: metadata.act_hash (the
+    (Requisition's display digest), and compares them with the SIGNED bytes: metadata.act_hash (the
     signed payload_hash when the metadata carries none), act_type, act_hash_alg, and, when the record
     signs one, display_digest (in a decision: display_projection_digest).
     A record under any other label (the withdrawn sha384+canonical_payload.v4 string included; an older opaque one)
@@ -43,24 +46,24 @@ Two independent halves, both reported:
     CO-SIGNING LAB KMS KEY, below). It prints no other ARN, and says what offline checking cannot:
     that the private keys are held in AWS KMS is the key file's statement, not checked here.
 
-RECORD.json may also be an ML-DSA-87 record's AgentReceipt form (LabRecords.agent_receipt_form/1: the
+RECORD.json may also be an ML-DSA-87 record's AgentReceipt form (the
 eleven agent_receipt.v1 fields as top-level members plus "signature" and "key_id"), bare or under "receipt"
 (beside "decision" in a /v1/execute answer). The signed bytes are then rebuilt by CanonicalPayload v3
-over the eleven fields (agent_receipt_form_test.exs: they re-encode to the stored signed_payload);
+over the eleven fields (they re-encode to the stored signed_payload);
 when a "decision" envelope rides beside it, the two must name the same bytes.
 
  3. THE POST-QUANTUM SIGNATURE (only when the key file's entry for the record's key_id says
     "algorithm": "mldsa87"). bin/lab-verify cannot check it (Python's stdlib has no ML-DSA; it
-    answers lab_signature_unchecked_mldsa87, exit 5). This file checks it with the vendored
+    answers lab_signature_unchecked_mldsa87, exit 7, a status of its own). This file checks it with the vendored
     pure-Python verifier bin/vendor/mldsa.py (Filippo Valsorda's mldsa 1.0.1, CC0-1.0 OR 0BSD; its
     SHA-256 is pinned below and checked before it is loaded): pure ML-DSA-87 (FIPS 204), EMPTY
     context, over the UTF-8 bytes of signed_payload -- the only form the lab seat signs
-    (:crypto.verify(:mldsa87, :none, ...), requisition.lab.verify_mldsa87.ex). The key entry must pass
+    (Erlang/OTP's :crypto.verify(:mldsa87, :none, ...)). The key entry must pass
     THE KEY RULE (below), its public_key base64 of 2,592 bytes hashing to its own
     public_key_fingerprint.
 
-CO-SIGNATURES (Requisition's LabRecords.append/5
-writes them under its option cosign: :mldsa87). An agent-tool record keeps ONE set of signed bytes with TWO
+CO-SIGNATURES (Requisition
+writes them under its ML-DSA-87 co-signing option). An agent-tool record keeps ONE set of signed bytes with TWO
 detached signatures: the Ed25519 envelope, and beside it "cosignature", a four-field envelope with the
 ML-DSA-87 signature over the SAME signed_payload. The signed metadata says which: "cosign":
 {"algorithm": "mldsa87", "key_id": ..., "status": "signed" | "seat_absent" | "signed_bytes_over_bound"}.
@@ -69,11 +72,13 @@ When a cosignature is present beside an Ed25519 record (in RECORD.json beside th
 equality; nothing is re-serialized), cosign.status "signed", its key_id equal to the signed
 cosign.key_id, that key's registry entry an mldsa87 one that passes THE KEY RULE, and the ML-DSA-87
 signature valid over those exact bytes. An Ed25519 record whose signed cosign.status is "signed" with
-no cosignature beside it was stripped: FAIL.
+no cosignature beside it was stripped: FAIL. A cosignature is present when --cosignature is given or the member
+"cosignature" is written beside the record, whatever JSON value it holds: a null there is a co-signature of the
+wrong form (FAIL), as false or {} is, never "no co-signature".
 
 A CO-SIGNING LAB KMS KEY (cosigning_kms_key; the rule bin/lab-verify's check_kms_key applies to the
 record's own key). Requisition signs "signer": "kms" and "kms_key_arn" into the cosign member when the
-co-signing seat is a KMS key, and neither when it is the dev seat (LabRecords.cosign_member/2). The
+co-signing seat is a KMS key, and neither when it is the dev seat. The
 signed cosign member marks its key a lab KMS key when it says "signer": "kms" or has a kms_key_arn
 member. A marked key's cosign member and key file entry must both say signer kms, its key_id must be
 the lab KMS prefix of its algorithm + a resource id, and the signed cosign.kms_key_arn must be a KMS
@@ -87,7 +92,7 @@ be present and valid; a record signed "seat_absent" or "signed_bytes_over_bound"
 member, FAILS, saying why. An outcome record (requisition.lab.outcome.v0) has no verdict: it is printed
 as "outcome reported by the caller (not proof the effect happened)".
 
-POLICY. THE KEY RULE (requisition's lab_key_rule.ex is its text;
+POLICY. THE KEY RULE (the issuing server's key rule is its text;
 the same one function is in requisition_aws/keys.py and bin/verify_chain.py; tests/vectors/key_rule_vectors.v1.json
 its shared vectors): a signature verifies under a key only if the key is not compromised/revoked, is active or retired,
 and the record's signed occurred_at lies in [valid_from, valid_to) -- so a retired key verifies its own window and
@@ -109,9 +114,26 @@ co-signature beside the record, whose bytes are part of the record's leaf in the
 checkpoint_ verdict_code) FAILS with exit 6, naming it; a pass requires the line "log checkpoint: all checks held: ..."
 in bin/lab-verify's answer (else exit 6 as well), and its PASS line says what the checkpoint shows and no more.
 
+WHAT A PASS SAYS. Every PASS (exit 0) prints, after its verdict line, one fixed sentence (PASS_LINE, the same text in
+every Requisition verifier): a pass shows the bytes were signed under the key supplied, and it is not permission to
+act. A deadline the signed bytes carry is reported after it as what the record says, for two kinds of record and no
+other: a decision that allowed (the signed verdict is "allow"; its deadline is the signed metadata's exec_not_after,
+or not_after when that is absent) and a statement (a statement record with no signed verdict, and exp; its deadline
+is exp), each in its own words. A record with no signed verdict and no exp, such as a caller grant, and a record of
+another kind that signs exp, have no window. The line is followed by "No
+time was compared." With --at TIME (one instant, YYYY-MM-DDTHH:MM:SSZ; any other value, or the flag given twice, is a
+usage error, exit 2, judged before any file is read) the last line says instead whether the record's window was open
+at that instant: from its start (a decision's decided_at, a statement's nbf) up to, and not at, the deadline, by
+comparing the signed text; a record that signs no start has only its end compared, and the line says so. No exit
+depends on a time: an expired decision is still a valid record. --at is handed to bin/lab-verify as well, so the
+answer of it printed in section 2 (its own sentence and lines, each behind "  | ") compares the same instant; the
+bin/lab-verify given must be one that takes the flag. A FAIL prints no line that is the sentence; section 2 may still
+show bin/lab-verify's own, behind "  | ", when its half passed and another half failed.
+tests/vectors/pass_lines_vectors.v1.json holds the rows.
+
 EXIT: 0 every half passes (binding equal; lab-verify lab_dev_key for a signer-dev record and lab_kms_key
 for a signer-kms one, or for an ML-DSA-87 record
-lab_signature_unchecked_mldsa87 AND the ML-DSA-87 signature valid here); 1 a binding mismatch or an
+lab_signature_unchecked_mldsa87 with its exit 7 AND the ML-DSA-87 signature valid here); 1 a binding mismatch or an
 unreadable record; 3 lab-verify did not answer as above; 4 the ML-DSA-87 signature, the co-signature or its key
 entry fails, or post-quantum is required (--require-pq, or the key file) and not met; 6 the log checkpoint is
 refused, or not said to hold (LOG CHECKPOINTS); 2 usage, including a usage error bin/lab-verify reports for the
@@ -136,11 +158,13 @@ LABEL = "sha384+canonical_payload.v3"
 ENVELOPE = ("signature", "key_id", "signed_payload", "receipt_hash")
 EXIT_OK, EXIT_MISMATCH, EXIT_USAGE, EXIT_LAB_VERIFY, EXIT_SIGNATURE = 0, 1, 2, 3, 4
 EXIT_CHECKPOINT = 6
+# bin/lab-verify's exit status for a record whose signature it did not check (the ML-DSA-87 path)
+LAB_UNCHECKED = 7
 # the log checkpoint's flags, handed to bin/lab-verify as given (LOG CHECKPOINTS), and the line that says every check held
 CHECKPOINT_FLAGS = ("--checkpoint", "--inclusion-proof", "--witness-policy", "--held-size", "--held-root",
-                    "--consistency-proof", "--key-transition", "--held-state")
+                    "--consistency-proof", "--key-transition", "--held-state", "--held-to-transition-proof")
 CHECKPOINT_HELD = "log checkpoint: all checks held: inclusion, witness quorum, not older than the held size"
-# the eleven agent_receipt.v1 fields (authority_receipts.ex @hashed_fields; agent_receipt_form_test.exs)
+# the eleven agent_receipt.v1 fields (the fields Requisition hashes)
 ELEVEN = ("chain_scope", "sequence", "receipt_type", "subject_type", "subject_id", "status",
           "payload_hash", "previous_hash", "occurred_at", "metadata", "schema_version")
 # the vendored verifier: bin/vendor/mldsa.py, PyPI mldsa 1.0.1 (bin/vendor/VENDORED.md)
@@ -151,6 +175,10 @@ MLDSA87_PUBLIC_BYTES, MLDSA87_SIGNATURE_BYTES = 2592, 4627
 # this file checks an Ed25519 record's co-signature itself (check_cosignature), so bin/lab-verify is told not to say
 # it did not
 CALLER_CHECKS_COSIGNATURE = "--cosignature-checked-by-caller"
+# No co-signature was given: no --cosignature flag and no member "cosignature" beside the record. A co-signature that IS
+# given is carried as given, whatever JSON value it holds (null included), and judged as one: presence is the flag's and
+# the member's, never the value's.
+NO_COSIGNATURE = type("NoCosignature", (), {"__repr__": lambda self: "NO_COSIGNATURE"})()
 OUTCOME_KIND = "requisition.lab.outcome.v0"  # the outcome record
 # The lab KMS keys' key id prefix by algorithm, and their signer label: bin/lab-verify's two assignments of
 # these names, copied (tests/test_cosign.py compares the two files' source). A KMS key id is the prefix +
@@ -179,11 +207,14 @@ _SHORT = {0x08: "\\b", 0x09: "\\t", 0x0A: "\\n", 0x0C: "\\f", 0x0D: "\\r", 0x22:
 class Refused(ValueError):
     def __init__(self, message, code=None):
         super().__init__(message)
-        self.code = code  # canonical_payload.v4's refusals carry the shared code; v3's carry none
+        self.code = code  # an encoder's refusal carries the name requisition_aws/canonical.py gives it, v3 and v4
 
 
 def _string(value):
-    value.encode("utf-8")  # a lone surrogate raises
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        raise Refused("a lone surrogate", "invalid_string") from None
     out = []
     for ch in value:
         cp = ord(ch)
@@ -206,17 +237,19 @@ def _encode(value):
     if isinstance(value, int):
         return str(value)
     if isinstance(value, float):
-        raise Refused("a float is outside the act-hash domain")
+        raise Refused("a float is outside the act-hash domain", "float_refused")
     if isinstance(value, str):
         return _string(value)
     if isinstance(value, dict):
-        if not all(isinstance(k, str) for k in value):
-            raise Refused("a non-string key")
+        for key in value:
+            if not isinstance(key, str):
+                raise Refused("a non-string key", "non_string_key")
+            _string(key)  # a lone surrogate in a name is refused before the names are sorted
         items = sorted(value.items(), key=lambda kv: kv[0].encode("utf-16-be"))
         return "{" + ",".join(_string(k) + ":" + _encode(v) for k, v in items) + "}"
     if isinstance(value, list):
         return "[" + ",".join(_encode(v) for v in value) + "]"
-    raise Refused("an unencodable value")
+    raise Refused("an unencodable value", "unencodable")
 
 
 def encode(value):
@@ -228,9 +261,9 @@ def encode(value):
 # refused HERE, by the encoder. tests/test_canonical_v4.py runs the shared vectors against both copies. -------------
 #
 # REASON PRECEDENCE, when a text has more than one fault. The reason is a function of the text alone, the same in all four
-# implementations (Requisition's CanonicalPayload.V4, requisition_aws/canonical.py, this copy and requisition-ts's
+# implementations (Requisition's version 4 encoder, requisition_aws/canonical.py, this copy and requisition-ts's
 # canonicalizeV4); the rows of group "two-faults" in tests/vectors/canonical_v4/vectors.jsonl pin it, and requisition's
-# bin/canonical-v4-compare compares the reason code of every row. The text is refused with the FIRST reason of this list that
+# four-way comparison tool compares the reason code of every row. The text is refused with the FIRST reason of this list that
 # applies, whatever the positions of the faults:
 #   1. invalid_utf8      the bytes are not UTF-8;
 #   2. too_deep          more than 64 nested containers, counted by a scan of the brackets outside strings alone (a double
@@ -466,7 +499,7 @@ def _finite_float(lexeme):
     return value
 
 
-MAX_DEPTH = 64  # containers; the 65th is refused (requisition-ts src/json.ts MAX_DEPTH; lab_key_rule.ex decode_bounded/1)
+MAX_DEPTH = 64  # containers; the 65th is refused (requisition-ts src/json.ts MAX_DEPTH; Requisition's bounded JSON reader has the same bound)
 MAX_INTEGER = 9_007_199_254_740_991  # CanonicalPayload v3's integer range (canonical.MAX_INTEGER)
 
 
@@ -559,10 +592,11 @@ def envelope_of(record):
 
 
 def cosignature_of(record):
-    """The co-signature beside the record in a /v1 answer, or None."""
-    if not isinstance(record, dict) or _is_envelope(record) or _is_form(record):
-        return None
-    return record.get("cosignature")
+    """The co-signature beside the record in a /v1 answer, as given (null included), or NO_COSIGNATURE when the answer
+    has no member "cosignature"."""
+    if not isinstance(record, dict) or _is_envelope(record) or _is_form(record) or "cosignature" not in record:
+        return NO_COSIGNATURE
+    return record["cosignature"]
 
 
 # --- the post-quantum half ---------------------------------------------------------------------
@@ -702,17 +736,17 @@ def check_binding(args, act_type, envelope):
 
 
 def run_lab_verify(lab_verify, envelope, registry, expected_hash, python, accept_signers=(), checkpoint=(),
-                   cosignature=None):
+                   cosignature=NO_COSIGNATURE, at=None):
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "record.json")
         with open(path, "w") as handle:
             # with the checkpoint flags, the co-signature rides beside the record: its bytes are in the record's leaf
-            json.dump(dict(envelope, cosignature=cosignature) if checkpoint and cosignature is not None else envelope,
+            json.dump(dict(envelope, cosignature=cosignature) if checkpoint and cosignature is not NO_COSIGNATURE else envelope,
                       handle)
         proc = subprocess.run(
             [python, "-I", lab_verify, "--receipt", path, "--registry", registry, "--act-hash", expected_hash,
              CALLER_CHECKS_COSIGNATURE] + [a for label in accept_signers for a in ("--accept-signer", label)]
-            + list(checkpoint),
+            + list(checkpoint) + ([] if at is None else ["--at", at]),
             capture_output=True,
             text=True,
             timeout=60,
@@ -753,7 +787,7 @@ def check_cosignature(envelope, cosignature, registry, mldsa=None, accept_signer
     cosign = md.get("cosign") if isinstance(md, dict) else None
     status = cosign.get("status") if isinstance(cosign, dict) else None
     lines = ["signed cosign: %s" % (json.dumps(cosign, sort_keys=True) if cosign is not None else "absent")]
-    if cosignature is None:
+    if cosignature is NO_COSIGNATURE:
         if status == "signed":
             return lines + ["co-signature: MISSING, yet the signed bytes say it exists: stripped"], False, False
         return lines + ["co-signature: none"], True, False
@@ -777,6 +811,93 @@ def check_cosignature(envelope, cosignature, registry, mldsa=None, accept_signer
     return lines + pq_lines, pq_ok, True
 
 
+# --- WHAT A PASS SAYS: one text in verify_receipt.py, bin/lab-verify, verify_offline.py and verify_chain.py ---
+# A pass is a statement about bytes and a key, and PASS_LINE says so after the verdict. A deadline the signed bytes
+# carry is reported as what the record says, never compared with a clock, for two kinds of record and no other. The
+# kind is read from the signed bytes (window_kind): a decision that allowed carries the verdict "allow" in its
+# metadata (WINDOW_DECISION: its deadline is exec_not_after, or not_after when that is absent, and its start is
+# decided_at); a statement is a record whose signed receipt_type is WINDOW_STATEMENT_TYPE and whose metadata carries
+# no verdict member and carries exp (WINDOW_STATEMENT: its deadline is exp, its start nbf). Every other record has no
+# window: a verdict that is not "allow" allowed nothing, a record of another kind that signs exp and no verdict is no
+# statement, and a record with no verdict and no exp is neither kind (a caller grant signs not_after, the day the
+# grant ends, which is no deadline for an execution). With an instant given (--at), that instant is compared with the signed values as text, which is
+# chronological order for the one accepted form: the window is open from its start (a record that signs none has
+# only its end compared) up to, and not at, its end. A member that is present and is not an instant of the accepted
+# form is said so and is never compared. No exit depends on any of it.
+PASS_LINE = (
+    "A pass shows these bytes were signed under the key you supplied. It is not permission to act. "
+    "Whether an action may run is decided by the issuing system when it runs."
+)
+# each kind: (the sentence its deadline is reported in, the members read as its end, the members read as its start)
+WINDOW_DECISION = ("This decision allowed execution until %s.", ("exec_not_after", "not_after"), ("decided_at",))
+WINDOW_STATEMENT = ("This statement was valid until %s.", ("exp",), ("nbf",))
+# the signed receipt_type of a statement record, the only kind whose exp is reported
+WINDOW_STATEMENT_TYPE = "requisition.lab.statement.v0"
+WINDOW_INSTANT_SHAPE = "dddd-dd-ddTdd:dd:ddZ"
+
+
+def window_instant(value):
+    """True for exactly YYYY-MM-DDTHH:MM:SSZ (ASCII digits) that is a real instant of the proleptic Gregorian
+    calendar: month 01 to 12, a day that month has in that year, hour 00 to 23, minute and second 00 to 59."""
+    if not (isinstance(value, str) and len(value) == 20
+            and all((c in "0123456789") if m == "d" else c == m for c, m in zip(value, WINDOW_INSTANT_SHAPE))):
+        return False
+    year, month, day = int(value[0:4]), int(value[5:7]), int(value[8:10])
+    if month < 1 or month > 12 or int(value[11:13]) > 23 or int(value[14:16]) > 59 or int(value[17:19]) > 59:
+        return False
+    leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+    return 1 <= day <= (31, 29 if leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[month - 1]
+
+
+def window_kind(signed, metadata):
+    """WINDOW_DECISION, WINDOW_STATEMENT or None: the kind of record a deadline is reported for. A signed verdict
+    decides alone: a record that carries one is a decision, and it allowed only when the verdict is the text
+    "allow". A record that carries none is a statement when its signed receipt_type is WINDOW_STATEMENT_TYPE and it
+    carries exp, and is neither kind otherwise."""
+    if "verdict" in metadata:
+        return WINDOW_DECISION if metadata["verdict"] == "allow" else None
+    if signed.get("receipt_type") != WINDOW_STATEMENT_TYPE:
+        return None
+    return WINDOW_STATEMENT if "exp" in metadata else None
+
+
+def window_lines(signed, at=None):
+    """The lines about the record's window that follow PASS_LINE; `at` is None or an accepted instant."""
+    if not isinstance(signed, dict):
+        signed = {}
+    metadata = signed.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+    sentence, end_names, start_names = window_kind(signed, metadata) or (None, (), ())
+    end_name = next((name for name in end_names if name in metadata), None)
+    if end_name is None:
+        return [] if at is None else ["No time was compared: this record carries no execution window."]
+    end = metadata[end_name]
+    if not window_instant(end):
+        return [
+            "The signed %s is not a readable instant, so no deadline is reported." % end_name,
+            "No time was compared." if at is None
+            else "No time was compared: the signed %s is not a readable instant." % end_name,
+        ]
+    lines = [sentence % end]
+    if at is None:
+        return lines + ["No time was compared."]
+    start_name = next((name for name in start_names if name in metadata), None)
+    if start_name is None:
+        if at < end:
+            return lines + ["At %s the window was open (until %s; the record signs no start, so none was compared)." % (at, end)]
+        return lines + ["At %s the window was closed (it ended at %s)." % (at, end)]
+    start = metadata[start_name]
+    if not window_instant(start):
+        return lines + ["No time was compared: the signed %s is not a readable instant." % start_name]
+    if at < start:
+        return lines + ["At %s the window was closed (it opened at %s)." % (at, start)]
+    if at >= end:
+        return lines + ["At %s the window was closed (it ended at %s)." % (at, end)]
+    return lines + ["At %s the window was open (from %s, until %s)." % (at, start, end)]
+# --- end of WHAT A PASS SAYS ---
+
+
 def main(argv):
     opts, i = {"checkpoint": []}, 0
     flags = ("--arguments", "--act-type", "--record", "--lab-verify", "--registry", "--python", "--cosignature")
@@ -793,6 +914,10 @@ def main(argv):
         elif argv[i] in flags and i + 1 < len(argv):
             opts[argv[i][2:]] = argv[i + 1]
             i += 2
+        elif argv[i] == "--at" and i + 1 < len(argv) and "at" not in opts and window_instant(argv[i + 1]):
+            # WHAT A PASS SAYS: the time is judged as an argument, before anything is read. It changes no verdict.
+            opts["at"] = argv[i + 1]
+            i += 2
         elif argv[i] in CHECKPOINT_FLAGS and i + 1 < len(argv) and argv[i] not in opts["checkpoint"]:
             opts["checkpoint"] += [argv[i], argv[i + 1]]
             i += 2
@@ -802,9 +927,10 @@ def main(argv):
         else:
             print("usage: verify_offline.py --arguments ARGS.json --act-type NAME --record RECORD.json "
                   "--lab-verify PATH --registry KEYS.json [--cosignature COSIG.json] [--require-pq] [--allow-classical-only] "
+                  "[--at YYYY-MM-DDTHH:MM:SSZ] "
                   "[--accept-signer LABEL]... [--python python3] [--checkpoint NOTE --inclusion-proof PROOF.json "
                   "--witness-policy POLICY [--held-size N --held-root ROOT | --held-state FILE [--write-held-state]] "
-                  "[--consistency-proof PROOF.json] [--key-transition RECORD.json]]",
+                  "[--consistency-proof PROOF.json] [--key-transition RECORD.json [--held-to-transition-proof PROOF.json]]]",
                   file=sys.stderr)
             return EXIT_USAGE
     missing = [f for f in ("arguments", "act-type", "record", "lab-verify", "registry") if f not in opts]
@@ -831,7 +957,7 @@ def main(argv):
     accept = opts.get("accept-signer")
     exit_code, verdict_code, output = run_lab_verify(
         opts["lab-verify"], envelope, opts["registry"], recomputed, opts.get("python", sys.executable or "python3"),
-        accept or (), opts["checkpoint"], cosignature
+        accept or (), opts["checkpoint"], cosignature, opts.get("at")
     )
     for line in output.splitlines():
         print("  | " + line)
@@ -855,7 +981,8 @@ def main(argv):
         except (OSError, ValueError) as error:
             pq_lines, pq_ok = ["the vendored verifier could not be loaded (%s)" % error], False
         pq_present = pq_ok
-        lab_ok = exit_code == 5 and verdict_code == "lab_signature_unchecked_mldsa87"
+        # bin/lab-verify checked no signature of this record, and says so with a status of its own (never 5)
+        lab_ok = exit_code == LAB_UNCHECKED and verdict_code == "lab_signature_unchecked_mldsa87"
     else:
         print("== 3. the post-quantum co-signature: ML-DSA-87 (FIPS 204) over the same bytes, checked here")
         try:
@@ -906,8 +1033,14 @@ def main(argv):
             print("verdict: FAIL (the log checkpoint: bin/lab-verify did not say every check held)")
             return EXIT_CHECKPOINT
     if not lab_ok:
-        print("verdict: FAIL (lab-verify did not answer %s for this record's signed signer %r)"
-              % ("lab_signature_unchecked_mldsa87" if pq else expected_code, signed_md.get("signer")))
+        wanted, wanted_exit = ("lab_signature_unchecked_mldsa87", LAB_UNCHECKED) if pq else (expected_code, 5)
+        if verdict_code == wanted:
+            # the code expected, with another status: say which (an unchecked answer is never a pass's status)
+            print("verdict: FAIL (lab-verify answered %s with exit %d, not %d, for this record's signed signer %r)"
+                  % (wanted, exit_code, wanted_exit, signed_md.get("signer")))
+        else:
+            print("verdict: FAIL (lab-verify did not answer %s for this record's signed signer %r)"
+                  % (wanted, signed_md.get("signer")))
         return EXIT_LAB_VERIFY
     if not pq_ok:
         print("verdict: FAIL (the ML-DSA-87 signature, the co-signature or its key entry does not check out)")
@@ -946,6 +1079,8 @@ def main(argv):
                  "witnesses of the given policy signed, not older than the tree size given (section 4).")
     print("verdict: PASS -- the record is bound to these arguments and %s under the LAB key(s)%s. %s"
           % (signatures, keys, said))
+    for line in [PASS_LINE] + window_lines(loads_strict(envelope["signed_payload"]), opts.get("at")):
+        print(line)
     return EXIT_OK
 
 

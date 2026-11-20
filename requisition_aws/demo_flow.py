@@ -5,8 +5,8 @@ fake Requisition; ``demo/run_demo.py`` only wires configuration, the model and t
 
   1. the agent runs; the hook proposes and interrupts with {request_id, approval_url};
   2. the app prints the link and polls GET /v1/sanction-requests/<id> until sanctioned, refused or
-     timeout (the first GET after the second approval mints the statement,
-     sanction_requests.ex:223-231), then resumes the agent;
+     timeout (the first GET after the second approval mints the statement),
+     then resumes the agent;
   3. the hook executes; the tool runs only on a signed allow;
   4. a second execute of the same statement under a fresh nonce: the signed deny statement_spent;
   5. every statement and decision is checked offline (bin/verify_offline.py, which runs
@@ -48,6 +48,20 @@ def demo_dir() -> pathlib.Path:
         print(DEMO_DIR_MESSAGE, file=sys.stderr)
         raise SystemExit(2)
     return pathlib.Path(value)
+
+
+SEED_MESSAGE = ("name the seed file (--seed, or REQUISITION_SEED): the file the Requisition server registered the "
+                "act type from")
+
+
+def demo_seed(given: str | None = None) -> str:
+    """The seed file a demo reads each act type's display_schema from: ``given`` (--seed), else REQUISITION_SEED.
+    No default: the file belongs to the Requisition installation the demo talks to. Called when a demo runs."""
+    value = given or os.environ.get("REQUISITION_SEED", "")
+    if not value:
+        print(SEED_MESSAGE, file=sys.stderr)
+        raise SystemExit(2)
+    return value
 
 
 def load_wrapper() -> str:

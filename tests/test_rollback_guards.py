@@ -4,13 +4,14 @@
 
 1. no record whose signature was not checked here ever reaches the position memory or the evidence
    (remembering before verifying is refused); a Gate without its key file refuses at the read;
-2. the rollback demo talks only to its own scratch server: port 4103 refused, a port already in use refused
+2. the rollback demo talks only to its own scratch server: a live port refused, a port already in use refused
    before anything starts, "up" only on the server's own UP line naming the scratch database;
-3. the scratch server runs no Oban queues or plugins;
+3. (the scratch server's script starts no background job queue: the script, and the check of it, are in
+   Requisition's repository, whose application the script starts);
 4. one CLAIM, with its precondition (nothing appended between the snapshot and the mint), in the docstring, the transcript and the README;
 6. verify_chain.py: an export with no positioned row is exit 2 (input), never 1 (FAIL);
 7. the position is read with the strict loader;
-9. the default server command runs under the load wrapper; the 4113/4103 cookie note; --dry-run stops before the
+9. the server command's {wrapper} is the load wrapper; the cookie note naming the live port; --dry-run stops before the
    server (the copy and the pg_dump/pg_restore round trip only).
 (5, the interceptor's tool error, is asserted in test_fence.py.)
 """
@@ -33,7 +34,7 @@ from requisition_aws.store import Store
 
 from .conftest import ACT_TYPE, refund_args
 from .test_fence import gate_for, lab, pos  # noqa: F401  (lab is a fixture)
-from .test_rollback_demo import demo
+from .test_rollback_demo import OPERATOR_SERVER_CMD, demo
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 D3 = ("If Requisition's database is rolled back, the same executor, with its own records intact, refuses to act "
@@ -186,13 +187,14 @@ def _free_port():
 
 
 def _lab(tmp_path, port, cmd, **kw):
-    return demo.ScratchLab(source_db="autonomous_agency_aws_demo2", port=port, server_cmd=cmd, out_dir=tmp_path,
+    return demo.ScratchLab(source_db="demo_source", port=port, server_cmd=cmd, out_dir=tmp_path,
                            t=Transcript(), **kw)
 
 
-def test_port_4103_is_refused(scratch_env, tmp_path):
-    with pytest.raises(demo.Refused, match="4103"):
-        _lab(tmp_path, 4103, "true")
+def test_a_live_port_is_refused(scratch_env, tmp_path):
+    with pytest.raises(demo.Refused, match="port 4999 is the live demo server's"):
+        _lab(tmp_path, 4999, "true", live_ports=frozenset({4113, 4999}))
+    assert _lab(tmp_path, 4998, "true", live_ports=frozenset({4113, 4999})).port == 4998
 
 
 def test_a_port_already_in_use_is_refused_before_anything_starts(scratch_env, tmp_path):
@@ -213,14 +215,14 @@ def _sleeper(line):
 
 def test_up_only_on_the_servers_own_up_line_naming_the_scratch_database(scratch_env, tmp_path):
     port = _free_port()
-    good = f"ROLLBACK SCRATCH SERVER UP on 127.0.0.1:{port}, database scratch_20261110120000_1_2, Oban queues and plugins off, pid 1"
+    good = f"ROLLBACK SCRATCH SERVER UP on 127.0.0.1:{port}, database scratch_20261110120000_1_2, job queues off, pid 1"
     lab_ = _lab(tmp_path, port, _sleeper(good), start_timeout=20)
     try:
         lab_.start()
         assert lab_.proc is not None and lab_.proc.poll() is None
     finally:
         lab_.stop()
-    other = good.replace("scratch_20261110120000_1_2", "autonomous_agency_aws_demo2")
+    other = good.replace("scratch_20261110120000_1_2", "demo_source")
     lab_ = _lab(tmp_path / "x", _free_port(), _sleeper(other), start_timeout=3)
     (tmp_path / "x").mkdir()
     try:
@@ -228,16 +230,6 @@ def test_up_only_on_the_servers_own_up_line_naming_the_scratch_database(scratch_
             lab_.start()
     finally:
         lab_.stop()
-
-
-# --- 3. no Oban on the copy ---------------------------------------------------------------------
-
-
-def test_the_scratch_server_runs_no_oban_queues_or_plugins():
-    text = (ROOT / "demo" / "rollback" / "serve_scratch.exs").read_text()
-    oban = text.index("Oban")
-    assert "queues: false" in text and "plugins: false" in text
-    assert oban < text.index("ensure_all_started") and "Oban queues and plugins off" in text
 
 
 # --- 4 and 9. the claim, the server command, the note, the dry run ------------------------------
@@ -251,18 +243,17 @@ def test_one_claim_d3_verbatim_with_the_d2_precondition_in_all_three_places():
     assert "would allow (not executed here" in text
 
 
-def test_the_default_server_command_runs_under_the_load_wrapper(monkeypatch, tmp_path):
-    assert demo.DEFAULT_SERVER_CMD.startswith("{wrapper} ")
+def test_the_server_command_runs_under_the_load_wrapper(monkeypatch, tmp_path):
     monkeypatch.setenv("SCRATCH_DB", "scratch_20261110120000_1_2")
     monkeypatch.setenv("PGDATABASE", "scratch_20261110120000_1_2")
     monkeypatch.setenv("REQUISITION_DEMO_DIR", str(tmp_path))
     monkeypatch.setenv("REQUISITION_LOAD_WRAPPER", "/opt/limit.sh")
-    lab = demo.ScratchLab(source_db="autonomous_agency_aws_demo2", port=4113, server_cmd=demo.DEFAULT_SERVER_CMD,
-                          out_dir=tmp_path, t=Transcript())
+    lab = demo.ScratchLab(source_db="demo_source", port=4113, server_cmd=OPERATOR_SERVER_CMD,
+                          out_dir=tmp_path, t=Transcript(), serve="path/to/scratch-server-script")
     assert lab.server_cmd.startswith("/opt/limit.sh bash -c ")
     monkeypatch.delenv("REQUISITION_LOAD_WRAPPER")
-    lab = demo.ScratchLab(source_db="autonomous_agency_aws_demo2", port=4113, server_cmd=demo.DEFAULT_SERVER_CMD,
-                          out_dir=tmp_path, t=Transcript())
+    lab = demo.ScratchLab(source_db="demo_source", port=4113, server_cmd=OPERATOR_SERVER_CMD,
+                          out_dir=tmp_path, t=Transcript(), serve="path/to/scratch-server-script")
     assert lab.server_cmd.startswith("bash -c ")
 
 
@@ -285,7 +276,8 @@ def test_dry_run_copies_and_round_trips_the_dump_then_stops_before_the_server(mo
         monkeypatch.setenv(k, v)
     monkeypatch.setenv("REQUISITION_DEMO_DIR", str(tmp_path))
     monkeypatch.setattr(demo, "ScratchLab", Recorder)
-    assert demo.main(["--transcript", str(tmp_path / "t.txt"), "--dry-run"]) == 0
+    assert demo.main(["--transcript", str(tmp_path / "t.txt"), "--dry-run", "--source-db", "demo_source",
+                      "--live-port", "4999"]) == 0
     names = [c[0] for c in Recorder.calls]
     assert names[:3] == ["copy_baseline", "snapshot", "restore"] and Recorder.calls[2][1] == {"restart": False}
     assert "start" not in names and "wait_approved" not in names
@@ -293,10 +285,11 @@ def test_dry_run_copies_and_round_trips_the_dump_then_stops_before_the_server(mo
     assert _flat(demo.CLAIM) in _flat(text) and "DRY RUN" in text
 
 
-def test_the_transcript_says_logging_in_on_4113_logs_the_browser_out_of_4103(monkeypatch, tmp_path):
+def test_the_transcript_says_logging_in_on_the_scratch_port_logs_the_browser_out_of_the_live_one(monkeypatch, tmp_path):
     for k, v in {"REQUISITION_CRED": "rqc_dry_run_credential_0001", "REQUISITION_PRINCIPAL": "rqp_dry_run", "REQUISITION_LAB_KEY_FILE": "/nonexistent"}.items():
         monkeypatch.setenv(k, v)
     monkeypatch.setenv("REQUISITION_DEMO_DIR", str(tmp_path))
     monkeypatch.setattr(demo, "ScratchLab", Recorder)
-    demo.main(["--transcript", str(tmp_path / "t.txt"), "--dry-run"])
-    assert "4103" in (tmp_path / "t.txt").read_text() and "logs" in (tmp_path / "t.txt").read_text()
+    demo.main(["--transcript", str(tmp_path / "t.txt"), "--dry-run", "--source-db", "demo_source", "--live-port", "4999"])
+    text = (tmp_path / "t.txt").read_text()
+    assert "127.0.0.1:4113 logs that browser out of the live server (port 4999)" in text

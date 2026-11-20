@@ -2,39 +2,38 @@
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """A port of Requisition's CanonicalPayload v3 encoder, its act hash, and its intake rules.
 
-Everything here is read from the Requisition version of 2026-10-26, file:line cited:
+Everything here is read from the code of the Requisition version of 2026-10-26:
 
-* ENCODING. ``lib/autonomous_agency/authority_assurance/canonical_payload.ex``:
-  - null/true/false, integers as ``Integer.to_string`` (:180-183);
-  - strings through ``Jason.encode!`` (:186-190): Jason's ``:json`` escape mode
-    (``deps/jason/lib/encode.ex:284-302``): ``\\b \\t \\n \\f \\r \\" \\\\`` short, every other byte
+* ENCODING. Requisition's canonical payload encoder, version 3:
+  - null/true/false, integers as Elixir's ``Integer.to_string``;
+  - strings through ``Jason.encode!``, in Jason's ``:json`` escape mode:
+    ``\\b \\t \\n \\f \\r \\" \\\\`` short, every other byte
     0x00-0x1F as ``\\u00XX`` with UPPER-case hex, everything else (``/``, DEL, non-ASCII) raw UTF-8;
-  - object keys sorted by UTF-16 code units (:220, :258-265), ``,`` and ``:`` with no spaces;
-  - floats are encoded by Requisition with Jason's float form (a declared RFC 8785 divergence,
-    :19-22). This port REFUSES every float instead: the act-hash domain has none (``ActHash`` moduledoc,
-    ``act_hash.ex:10-12``; ``args_schema.ex:87`` refuses a float at intake), so a float can only be
+  - object keys sorted by UTF-16 code units, ``,`` and ``:`` with no spaces;
+  - floats are encoded by Requisition with Jason's float form (a declared RFC 8785 divergence).
+    This port REFUSES every float instead: the act-hash domain has none (Requisition defines its act hash
+    over float-free arguments and refuses a float at intake), so a float can only be
     an adapter bug, and refusing it fails closed.
-* ACT HASH. ``act_hash.ex:36-41``: lower-case hex SHA-384 of the v3 bytes of the arguments object
-  with the key ``"act_type"`` put inside it. Label ``sha384+canonical_payload.v3`` (:21).
-* DISPLAY DIGEST of an argument row: ``Effector.encode/2`` (``effector.ex:113-118``): SHA-256 hex of the v3 bytes of the
+* ACT HASH. Lower-case hex SHA-384 of the v3 bytes of the arguments object
+  with the key ``"act_type"`` put inside it. Label ``sha384+canonical_payload.v3``.
+* DISPLAY DIGEST of an argument row: SHA-256 hex of the v3 bytes of the
   arguments object WITHOUT ``act_type``; the statement signs it as ``display_digest``
-  (``sanction_requests.ex:378``) and the decision as ``display_projection_digest``
-  (``execute.ex:573``), compared at execute 6b (``execute.ex:498-502``).
-* INTAKE. ``display.ex:84-100`` (via ``args_schema.ex:172-173``): a string is refused
+  and the decision as ``display_projection_digest``, and Requisition compares the two at execute.
+* INTAKE. Requisition's check of a displayed value: a string is refused
   ``forbidden_character`` (Unicode Cc, Cf, Zl, Zp), ``string_not_nfc``, ``display_value_redactable``
-  (``Security.Redaction.redact_text/1`` would change it); an integer outside +-(2^53-1) or another
-  type is ``malformed_member``; ``null`` anywhere is ``missing_member`` (``args_schema.ex:164``).
+  (Requisition's redactor would change it); an integer outside +-(2^53-1) or another
+  type is ``malformed_member``; ``null`` anywhere is ``missing_member``.
   A float member at any depth is ``float_refused`` with its path, before any other check (``refuse_float``),
   the name the encoders below give it; an arguments value that is not an object stays ``malformed_member``.
-  The redactor (``lib/autonomous_agency/security/redaction.ex``) is ported below, pattern by pattern.
-* The member names the adapter keeps out of the top level (``RESERVED_TOP_LEVEL``; ``effector.ex:145``,
-  ``:159-170``): ``members``, ``membership_digest``, ``cue_ready_digest``, ``emitter_mode``; and
-  ``act_type`` (``args_schema.ex:23-25``).
+  Requisition's redactor is ported below, pattern by pattern.
+* The member names the adapter keeps out of the top level (``RESERVED_TOP_LEVEL``):
+  ``members``, ``membership_digest``, ``cue_ready_digest``, ``emitter_mode``; and
+  ``act_type``.
 
 Every refusal here happens BEFORE anything is sent to Requisition: fail closed.
 
 CANONICAL_PAYLOAD.V4 is a second encoder beside the v3 one, a port of Requisition's
-``CanonicalPayload.V4``: a STRICT SUBSET of RFC 8785. For every input ``encode_v4`` accepts, its bytes are
+version 4 encoder: a STRICT SUBSET of RFC 8785. For every input ``encode_v4`` accepts, its bytes are
 exactly the bytes RFC 8785 prescribes; everything else is refused by the encoder itself. It differs from
 ``encode`` in four places, each a narrowing: control characters escape in LOWER-case hex; an integer outside
 +-(2^53-1) is ``integer_out_of_range`` (``encode`` writes it exactly); a lone surrogate is ``lone_surrogate``;
@@ -47,9 +46,9 @@ It also takes exact ``int``, ``str``, ``dict`` and ``list`` only (a subclass cou
 ``tests/vectors/canonical_v4`` (a byte copy of Requisition's, pinned by digest).
 
 REASON PRECEDENCE, when a text has more than one fault. The reason is a function of the text alone, the same in all four
-implementations (Requisition's CanonicalPayload.V4, this module, the offline verifier's copy and requisition-ts's
+implementations (Requisition's version 4 encoder, this module, the offline verifier's copy and requisition-ts's
 canonicalizeV4); the rows of group "two-faults" in tests/vectors/canonical_v4/vectors.jsonl pin it, and requisition's
-bin/canonical-v4-compare compares the reason code of every row. The text is refused with the FIRST reason of this list that
+four-way comparison tool compares the reason code of every row. The text is refused with the FIRST reason of this list that
 applies, whatever the positions of the faults:
   1. invalid_utf8      the bytes are not UTF-8;
   2. too_deep          more than 64 nested containers, counted by a scan of the brackets outside strings alone (a double
@@ -76,8 +75,8 @@ from typing import Any, Iterable
 
 ACT_HASH_ALG = "sha384+canonical_payload.v3"
 ACT_HASH_ALGS = (ACT_HASH_ALG,)  # the labels this package derives under; it SENDS the first; sha384+canonical_payload.v4 is not a label (withdrawn): encode_v4 is an encoder only
-MAX_DEPTH_V4 = 64  # containers; the 65th is refused (CanonicalPayload.V4.max_depth/0)
-MAX_INTEGER = 9_007_199_254_740_991  # display.ex:74, args_schema.ex:38
+MAX_DEPTH_V4 = 64  # containers; the 65th is refused (the depth bound of Requisition's version 4 encoder)
+MAX_INTEGER = 9_007_199_254_740_991  # Requisition's integer range at intake
 RESERVED_TOP_LEVEL = ("act_type", "members", "membership_digest", "cue_ready_digest", "emitter_mode")
 
 
@@ -106,7 +105,7 @@ _SHORT = {0x08: "\\b", 0x09: "\\t", 0x0A: "\\n", 0x0C: "\\f", 0x0D: "\\r", 0x22:
 
 def _string(value: str, path: list) -> str:
     try:
-        value.encode("utf-8")  # a lone surrogate is not valid UTF-8 (canonical_payload.ex:186-189)
+        value.encode("utf-8")  # a lone surrogate is not valid UTF-8
     except UnicodeEncodeError:
         raise CanonicalRefusal("invalid_string", path) from None
     out = []
@@ -323,7 +322,7 @@ _ENCODERS = {ACT_HASH_ALG: encode}
 
 
 def preimage(act_type: str, args: dict, alg: str = ACT_HASH_ALG) -> bytes:
-    """The bytes ``ActHash.derive/3`` hashes: the arguments object with ``act_type`` put inside, under
+    """The bytes Requisition's act hash is taken over: the arguments object with ``act_type`` put inside, under
     ``alg``'s encoder. An unknown label is refused ``act_hash_alg_unknown``, never derived under another."""
     encoder = _ENCODERS.get(alg) if isinstance(alg, str) else None
     if encoder is None:
@@ -331,8 +330,8 @@ def preimage(act_type: str, args: dict, alg: str = ACT_HASH_ALG) -> bytes:
     if not isinstance(args, dict):
         raise CanonicalRefusal("not_an_object", [])
     if "act_type" in args:
-        # Map.put would overwrite it (act_hash.ex:37); an argument row can never carry one
-        # (args_schema.ex:23-25), so the port refuses rather than silently overwrite
+        # Requisition's act hash would overwrite it (Elixir's Map.put); an argument row can never
+        # carry one, so the port refuses rather than silently overwrite
         raise CanonicalRefusal("act_type_member_reserved", ["act_type"])
     if not isinstance(act_type, str) or not act_type:
         raise CanonicalRefusal("act_type_not_a_string", [])
@@ -346,11 +345,11 @@ def act_hash(act_type: str, args: dict, alg: str = ACT_HASH_ALG) -> str:
 
 
 def display_digest(args: dict) -> str:
-    """An argument row's ``display_digest`` / ``display_projection_digest`` (Requisition's ``Effector.encode/2``)."""
+    """An argument row's ``display_digest`` / ``display_projection_digest`` (as Requisition computes it)."""
     return hashlib.sha256(encode(args)).hexdigest()
 
 
-# --- the redactor (redaction.ex), byte mode ------------------------------------------------------
+# --- the redactor (Requisition's), byte mode ------------------------------------------------------
 #
 # Elixir's ~r without the `u` flag is PCRE in byte (non-UTF) mode: \w, \s, \b and /i are ASCII
 # only and `.` is a byte. Python's `re` over `bytes` patterns has exactly those semantics, so the
@@ -358,7 +357,7 @@ def display_digest(args: dict) -> str:
 
 _I = re.IGNORECASE
 
-_SECRET_KEY_WORDS = (  # redaction.ex:146-149
+_SECRET_KEY_WORDS = (  # the redactor's secret key words
     rb"[A-Za-z0-9_\-]*(?:api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|"
     rb"private[_-]?key|client[_-]?secret|secret|password|passwd|pwd|token|"
     rb"authorization|bearer|passphrase|userinfo|cookie)[A-Za-z0-9_\-]*"
@@ -406,9 +405,9 @@ _REDACTED = b"[REDACTED]"
 
 
 def redact_text(value: str, configured_secrets: Iterable[str] = ()) -> str:
-    """``Redaction.redact_text(value, :untrusted)`` (redaction.ex:319-330), step for step.
+    """Requisition's redactor in its untrusted-text mode, step for step.
 
-    ``configured_secrets`` stands in for the server's env secrets (redaction.ex:118-131, :618-623),
+    ``configured_secrets`` stands in for the server's env secrets,
     which an adapter cannot read: pass any you know; the server refuses the rest itself.
     """
     data = value.encode("utf-8")
@@ -426,17 +425,17 @@ def redact_text(value: str, configured_secrets: Iterable[str] = ()) -> str:
 
 
 def would_redact(value: str, configured_secrets: Iterable[str] = ()) -> bool:
-    """Would ``Redaction.redact_text/1`` change ``value``? (display.ex:95)"""
+    """Would Requisition's redactor change ``value``?"""
     return redact_text(value, configured_secrets) != value
 
 
 # --- intake ------------------------------------------------------------------------------------
 
-_FORBIDDEN_CATEGORIES = {"Cc", "Cf", "Zl", "Zp"}  # display.ex:75
+_FORBIDDEN_CATEGORIES = {"Cc", "Cf", "Zl", "Zp"}  # refused by Requisition's check of a displayed value
 
 
 def check_string(value: str, path: str = "", configured_secrets: Iterable[str] = ()) -> None:
-    """``Display.check_value/1`` for a string, in its order (display.ex:90-98)."""
+    """Requisition's check of a displayed string, in its order."""
     if not isinstance(value, str):
         raise IntakeRefusal("malformed_member", path)
     try:
@@ -507,10 +506,10 @@ def check_arguments(args: Any, configured_secrets: Iterable[str] = ()) -> None:
     _check_value(args, "", tuple(configured_secrets))
 
 
-# --- the argument schema (args_schema.ex), the facets an adapter can check alone ----------------
+# --- the argument schema (Requisition's), the facets an adapter can check alone ----------------
 
 _TYPES = {"i", "s", "enum", "b", "list", "obj"}
-_FACETS = {  # args_schema.ex:29-36, minus the cross-member facets this port does not carry
+_FACETS = {  # Requisition's facets, minus the cross-member facets this port does not carry
     "i": {"min", "max"},
     "s": {"min_length", "max_length"},
     "enum": {"values"},
@@ -522,13 +521,13 @@ _UNPORTED = {"length_of", "greater_than", "sorted"}
 
 
 class ArgsSchema:
-    """A path-form ``display_schema`` (args_schema.ex:1-26), validated locally before propose.
+    """A path-form ``display_schema``, validated locally before propose.
 
-    Requisition re-validates at propose (``effector.ex:134``) and its answer is the one that counts;
+    Requisition re-validates at propose and its answer is the one that counts;
     this copy only lets the adapter refuse early. A schema using a facet this port does not carry
     (``length_of``, ``greater_than``, ``sorted``) is refused at construction: fail closed.
-    String lengths are counted in code points; Requisition counts graphemes (``String.length``,
-    ``args_schema.ex:219``), so for ``max_length`` this copy is never looser.
+    String lengths are counted in code points; Requisition counts graphemes (Elixir's
+    ``String.length``), so for ``max_length`` this copy is never looser.
     """
 
     def __init__(self, entries: list[dict]):
@@ -561,7 +560,7 @@ class ArgsSchema:
         return out
 
     def validate(self, args: Any, configured_secrets: Iterable[str] = ()) -> None:
-        """Shape first, then facets, as ``ArgsSchema.validate/2`` (args_schema.ex:93-101)."""
+        """Shape first, then facets, in the order of Requisition's schema validation."""
         if not isinstance(args, dict):
             raise IntakeRefusal("malformed_member", "")
         refuse_float(args)

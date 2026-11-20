@@ -22,6 +22,7 @@ from .conftest import ACT_TYPE, refund_args
 from .fake_requisition import FakeRequisition, MLDSA_KEY_ID
 from .test_canonical import SEED_SCHEMA
 from .test_key_rule import _sources
+from .test_pass_lines import PASS_LINE
 from .test_verify_offline import LAB_VERIFY, SCRIPT, vo
 
 pytestmark = pytest.mark.skipif(
@@ -70,6 +71,16 @@ def signed(tmp_path, clock):
         server.stop()
 
 
+def pass_verdict(stdout):
+    """The verdict line of a pass: the line the fixed sentence follows. After the sentence come only the lines about
+    the deadline the record signs (tests/test_pass_lines.py pins each of them)."""
+    lines = stdout.splitlines()
+    assert lines.count(PASS_LINE) == 1, stdout
+    said = lines[lines.index(PASS_LINE) + 1:]
+    assert all(line.startswith(("This decision allowed execution until ", "No time was compared")) for line in said), stdout
+    return lines[lines.index(PASS_LINE) - 1]
+
+
 def run(paths, record, *extra, registry=None):
     return subprocess.run(
         [sys.executable, "-I", str(SCRIPT), "--arguments", str(paths["args"]), "--act-type", ACT_TYPE,
@@ -111,10 +122,10 @@ def test_required_by_the_key_file_alone_the_met_line_names_the_key_file_not_a_fl
 
 
 # --- a co-signature by a lab KMS key -------------------------------------------
-# What Requisition signs (lab_records.ex): labels/1 puts signer kms and kms_key_arn in the metadata of a record a KMS
-# seat signs; cosign_member/2 puts the co-signing seat's key_id in the signed cosign member and, when that seat is a
+# What Requisition signs: signer kms and kms_key_arn in the metadata of a record a KMS
+# seat signs; the co-signing seat's key_id in the signed cosign member and, when that seat is a
 # KMS seat, signer kms and its kms_key_arn. Under REQUISITION_LAB_SIGNER=kms the co-signing seat is the KMS ML-DSA-87
-# key, or the dev ML-DSA-87 seat when only its variable is set (lab_signer.ex, boot_kms): the signed cosign member
+# key, or the dev ML-DSA-87 seat when only its variable is set: the signed cosign member
 # then carries neither signer nor kms_key_arn.
 
 KMS_ED = "requisition_lab_kms_ed25519_1234abcd-12ab-34cd-56ef-1234567890ab"
@@ -209,7 +220,7 @@ def test_a_kms_co_signature_whose_signed_arn_is_its_keys_passes_and_the_line_nam
     proc = run(signed[0], record, *flags, registry=keys)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "lab-verify exit 5, verdict_code lab_kms_key" in proc.stdout
-    assert proc.stdout.splitlines()[-1] == PASS_BOTH % (KMS_KEYS % (ARN_ED + ", " + ARN_PQ))
+    assert pass_verdict(proc.stdout) == PASS_BOTH % (KMS_KEYS % (ARN_ED + ", " + ARN_PQ))
 
 
 @pytest.mark.parametrize("case", ["the signed ARN is another key's", "no ARN is signed", "the entry says signer dev",
@@ -234,7 +245,7 @@ def test_a_kms_record_co_signed_by_a_key_the_signed_bytes_name_no_kms_key_for_pa
     record, keys = kms_record(signed, tmp_path, cosign, signer)
     proc = run(signed[0], record, "--require-pq", registry=keys)
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert proc.stdout.splitlines()[-1] == PASS_NO_KMS_KEY_NAMED % (ARN_ED, cosign["key_id"], signer)
+    assert pass_verdict(proc.stdout) == PASS_NO_KMS_KEY_NAMED % (ARN_ED, cosign["key_id"], signer)
 
 
 def test_an_arn_in_the_signed_cosign_of_a_record_with_no_co_signature_is_not_named(signed, tmp_path):
@@ -243,7 +254,7 @@ def test_an_arn_in_the_signed_cosign_of_a_record_with_no_co_signature_is_not_nam
     proc = run(signed[0], record, registry=keys)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "co-signature: none" in proc.stdout
-    assert proc.stdout.splitlines()[-1] == PASS_ED % (KMS_KEYS % ARN_ED)
+    assert pass_verdict(proc.stdout) == PASS_ED % (KMS_KEYS % ARN_ED)
 
 
 def test_a_kms_record_with_no_co_signature_names_no_co_signing_key(signed, tmp_path):
@@ -251,13 +262,13 @@ def test_a_kms_record_with_no_co_signature_names_no_co_signing_key(signed, tmp_p
     record, keys = kms_record(signed, tmp_path, absent, cosigned=False)
     proc = run(signed[0], record, registry=keys)
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert proc.stdout.splitlines()[-1] == PASS_ED % (KMS_KEYS % ARN_ED)
+    assert pass_verdict(proc.stdout) == PASS_ED % (KMS_KEYS % ARN_ED)
 
 
 def test_a_dev_records_pass_line_names_no_key(signed):
     proc = run(signed[0], "decision", "--require-pq")
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert proc.stdout.splitlines()[-1] == PASS_BOTH % "(DEGRADED (lab): dev keys served by the lab, not a trust root)"
+    assert pass_verdict(proc.stdout) == PASS_BOTH % "(DEGRADED (lab): dev keys served by the lab, not a trust root)"
 
 
 def test_an_outcome_is_the_callers_report_not_proof(signed):
@@ -265,7 +276,7 @@ def test_an_outcome_is_the_callers_report_not_proof(signed):
     proc = run(paths, "outcome", "--require-pq")
     assert "outcome reported by the caller (not proof the effect happened): succeeded" in proc.stdout
     assert "signed verdict: none" in proc.stdout and "evidence caller_report" in proc.stdout
-    assert "not proof the effect happened." in proc.stdout.splitlines()[-1]
+    assert "not proof the effect happened." in pass_verdict(proc.stdout)
 
 
 def test_an_outcome_carrying_a_verdict_is_a_mismatch():

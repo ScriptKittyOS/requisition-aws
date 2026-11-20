@@ -12,29 +12,40 @@
 # approver accounts approve in the console. Each step's full transcript is written under $OUT; the screen shows a short version
 # (demo/present.py: no lab-verify raw output, credentials elided).
 #
-#   export REQUISITION_URL=http://127.0.0.1:4103 REQUISITION_CRED=... REQUISITION_PRINCIPAL=...
+#   export REQUISITION_URL=http://127.0.0.1:4000 REQUISITION_CRED=... REQUISITION_PRINCIPAL=...
 #   export REQUISITION_LAB_KEY_FILE=...       # required; steps 1 and 3 refuse unless GET /v1/keys serves the
 #                                             # same bytes; step 2 checks every signature against it
 #   export REQUISITION_DEMO_DIR=...           # required; see below
+#   export REQUISITION_SEED=...               # required; see below
 #   demo/rehearse.sh
 #
 # Knobs (environment):
 #   STRANDS_MODE=bedrock|scripted   step 1's model (default bedrock; scripted calls no model)
-#   REQUIRE_PQ=1|0                  require each record's ML-DSA-87 co-signature (default 1; 0 against a server without co-signatures),
+#   REQUIRE_PQ=1|0                  require each record's ML-DSA-87 co-signature (default 1; 0 against a server without co-signatures;
+#                                   any other value, empty included, stops the script before anything runs),
 #                                   at RUN time in all three forms (the tool runs only on a checked record) and in
 #                                   the offline and airgap checks
 #   STEPS="1 2 3 4"                 which steps
 #   REQUISITION_DEMO_DIR=<dir>      REQUIRED, no default: the demo folder (req/ is a Requisition checkout;
 #                                   transcripts go to log/)
+#   REQUISITION_SEED=<file>         REQUIRED, no default: the seed file the Requisition server registered the act
+#                                   type from (a dry run reads this repository's copy when it is unset)
 #   REQUISITION_LOAD_WRAPPER=<cmd>  optional: a command placed before docker in step 4 (a resource-limit script, say)
 #   OUT=<dir>                       where transcripts go (default $REQUISITION_DEMO_DIR/log/rehearsal-<UTC>)
-#   REHEARSE_DRY=1                  a DRY RUN: a local fake /v1 (tests/fake_server_main.py, NOT Requisition)
+#   REHEARSE_DRY=1|0                1: a DRY RUN: a local fake /v1 (tests/fake_server_main.py, NOT Requisition)
 #                                   that auto-approves, STRANDS_MODE=scripted; no live server, no Bedrock
 set -uo pipefail
+# a 1/0 knob takes exactly 1 or 0; any other value stops here, so a misspelled value never picks the weaker setting
+switch() { case "${!1-$2}" in 1|0) ;; *) echo "$1 must be exactly 1 or 0 (unset: $2); refusing to start" >&2; exit 2 ;; esac; }
+switch REQUIRE_PQ 1
+switch REHEARSE_DRY 0
 cd "$(dirname "$0")/.."
 REPO=$(pwd)
 : "${REQUISITION_DEMO_DIR:?set REQUISITION_DEMO_DIR to the demo folder (req/ is a Requisition checkout; transcripts go to log/)}"
 export REQUISITION_DEMO_DIR   # the demos read it
+if [ "${REHEARSE_DRY:-0}" = 1 ]; then : "${REQUISITION_SEED:=$REPO/tests/fixtures/seed/aws_demo.v1.json}"; fi
+: "${REQUISITION_SEED:?set REQUISITION_SEED to the seed file the Requisition server registered the act type from}"
+export REQUISITION_SEED       # the demos and the dry-run fake read it
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 OUT=${OUT:-$REQUISITION_DEMO_DIR/log/rehearsal-$STAMP}
 STEPS=${STEPS:-"1 2 3 4"}

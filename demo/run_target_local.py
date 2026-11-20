@@ -7,8 +7,9 @@ It runs against the live lab. It serves requisition_aws.mcp_target on
 127.0.0.1 (a random port) and speaks MCP 2026-07-28 to it over HTTP, as a Gateway would. No Gateway, no
 Lambda, no AWS call. The refund tool writes REFUND SENT to a local ledger beside the transcript.
 
-    export REQUISITION_URL=http://127.0.0.1:4103 REQUISITION_CRED=... REQUISITION_PRINCIPAL=...
+    export REQUISITION_URL=http://127.0.0.1:4000 REQUISITION_CRED=... REQUISITION_PRINCIPAL=...
     export REQUISITION_LAB_KEY_FILE=...        # required; compared byte for byte with GET /v1/keys
+    export REQUISITION_SEED=/path/to/seed.json # required (or --seed): the file the server registered the act type from
     uv run python demo/run_target_local.py --transcript <dir>/target.txt [--no-require-pq]
 """
 
@@ -24,7 +25,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from requisition_aws.client import Client  # noqa: E402
-from requisition_aws.demo_flow import Transcript, demo_dir, verify_all  # noqa: E402
+from requisition_aws.demo_flow import Transcript, demo_dir, demo_seed, verify_all  # noqa: E402
 from requisition_aws.gate import Gate  # noqa: E402
 from requisition_aws.keys import KeyRegistry  # noqa: E402
 from requisition_aws.mcp_target import Ledger, McpTarget, refund_tool  # noqa: E402
@@ -39,7 +40,7 @@ TOOL_ARGS = {"amount_minor": 3100, "currency": "EUR", "account": "acct-6604", "r
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--transcript", required=True)
-    ap.add_argument("--seed", default=None, help="default: under REQUISITION_DEMO_DIR")
+    ap.add_argument("--seed", default=None, help="the seed file; or REQUISITION_SEED (no default)")
     ap.add_argument("--lab-verify", default=None, help="default: under REQUISITION_DEMO_DIR")
     ap.add_argument("--poll", type=float, default=3.0)
     ap.add_argument("--timeout", type=float, default=600.0)
@@ -47,8 +48,7 @@ def main(argv=None) -> int:
                     help="require each record's ML-DSA-87 co-signature at run time and offline")
     a = ap.parse_args(argv)
     DEMO = demo_dir()
-    if a.seed is None:
-        a.seed = str(DEMO / "req" / "lab" / "seed" / "aws_demo.v1.json")
+    a.seed = demo_seed(a.seed)
     if a.lab_verify is None:
         a.lab_verify = str(DEMO / "req" / "bin" / "lab-verify")
     missing = [k for k in ("REQUISITION_URL", "REQUISITION_CRED", "REQUISITION_PRINCIPAL", "REQUISITION_LAB_KEY_FILE")

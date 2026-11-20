@@ -50,7 +50,7 @@ class ToolRegistry:
     def from_seed(cls, seed_path: str, tools: dict) -> "ToolRegistry":
         """Bind ``{tool_name: act_type}`` (or ``{tool_name: {"act_type", "tool_digest"}}``, a v2 row's
         pin) with each act type's display_schema read from a lab seed file
-        (``lab/seed/aws_demo.v1.json``, schema ``requisition.lab.seed.v1``)."""
+        (schema ``requisition.lab.seed.v1``; the demo's is the set ``aws_demo``)."""
         with open(seed_path, "rb") as handle:
             seed = json.load(handle)
         rows = {row["registration"]["name"]: row["registration"] for row in seed.get("act_types", [])}

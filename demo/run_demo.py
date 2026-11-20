@@ -9,10 +9,11 @@ synthetic prompts only). --scripted calls no model at all (the fallback).
 
     export REQUISITION_DEMO_DIR=/path/to/demo       # required: req/ is a Requisition checkout; transcripts go to log/
     # export REQUISITION_LOAD_WRAPPER=/path/to/cmd  # optional: a command placed before docker (--airgap)
-    export REQUISITION_URL=http://127.0.0.1:4103
+    export REQUISITION_URL=http://127.0.0.1:4000
     export REQUISITION_CRED='rqc_...'          # the caller credential; never printed
     export REQUISITION_PRINCIPAL='rqp_...'
     export REQUISITION_LAB_KEY_FILE=...        # required; GET /v1/keys must serve the same bytes
+    export REQUISITION_SEED=/path/to/seed.json # required (or --seed): the file the server registered the act type from
     # export REQUISITION_SOCKET=/path/to.sock  # only if REQUISITION_LAB_SOCKET=true on the server
     uv run python demo/run_demo.py --transcript "$REQUISITION_DEMO_DIR/log/demo-transcript.txt"
     uv run python demo/run_demo.py --scripted --transcript ...
@@ -42,7 +43,7 @@ sys.path.insert(0, str(ROOT))
 from strands import Agent, tool  # noqa: E402
 
 from requisition_aws.client import Client  # noqa: E402
-from requisition_aws.demo_flow import AIRGAP_IMAGE, Transcript, airgap_check, replay_attempt, run_agent, demo_dir, load_wrapper, verify_all  # noqa: E402
+from requisition_aws.demo_flow import AIRGAP_IMAGE, Transcript, airgap_check, replay_attempt, run_agent, demo_dir, demo_seed, load_wrapper, verify_all  # noqa: E402
 from requisition_aws.gate import Gate  # noqa: E402
 from requisition_aws.keys import KeyRegistry  # noqa: E402
 from requisition_aws.registry import ToolRegistry  # noqa: E402
@@ -98,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--transcript", required=True, help="where to write the transcript (no credentials)")
     parser.add_argument("--scripted", action="store_true", help="no model: a scripted agent calls the tool")
     parser.add_argument("--store", default=None, help="idempotency store (default: beside the transcript)")
-    parser.add_argument("--seed", default=None, help="default: under REQUISITION_DEMO_DIR")
+    parser.add_argument("--seed", default=None, help="the seed file; or REQUISITION_SEED (no default)")
     parser.add_argument("--lab-verify", default=None, help="default: under REQUISITION_DEMO_DIR")
     parser.add_argument("--approval-base", default=None, help="console base URL (default REQUISITION_URL)")
     parser.add_argument("--poll", type=float, default=3.0)
@@ -113,8 +114,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="the load wrapper docker runs under ('' for none; default: REQUISITION_LOAD_WRAPPER, else none)")
     opts = parser.parse_args(argv)
     DEMO = demo_dir()
-    if opts.seed is None:
-        opts.seed = str(DEMO / "req" / "lab" / "seed" / "aws_demo.v1.json")
+    opts.seed = demo_seed(opts.seed)
     if opts.lab_verify is None:
         opts.lab_verify = str(DEMO / "req" / "bin" / "lab-verify")
     if opts.wrapper is None:
@@ -133,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     global TRANSCRIPT
     t = TRANSCRIPT = Transcript(secrets_to_elide=(cred,))
 
-    # REQUISITION_SOCKET: once Requisition's Unix socket is configured, /v1 answers only on it (router.ex:19-23)
+    # REQUISITION_SOCKET: once Requisition's Unix socket is configured, /v1 answers only on it
     client = Client(url, cred, principal, unix_socket=os.environ.get("REQUISITION_SOCKET") or None)
     keys_bytes = pathlib.Path(os.environ["REQUISITION_LAB_KEY_FILE"]).read_bytes()  # the pinned key file
     if client.keys() != keys_bytes:  # GET /v1/keys must serve the same bytes

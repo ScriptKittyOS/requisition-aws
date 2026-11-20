@@ -2,7 +2,7 @@
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """A stdlib HTTP client for Requisition's lab ``/v1`` execute API.
 
-Routes (``lib/autonomous_agency_web/v1/router.ex:8-14``, ``:114-124``):
+Routes:
 
   POST /v1/sanction-requests       201 {request_id, status: "pending"}
   GET  /v1/sanction-requests/:id   200 {status: pending | sanctioned (+statement_id,
@@ -13,20 +13,20 @@ Routes (``lib/autonomous_agency_web/v1/router.ex:8-14``, ``:114-124``):
 
 Body shapes, from the code (an argument row, ``act_hash_derivation: args_sha384``):
 
-* propose (``sanction_requests.ex:75-76``; the fixture ``execute_api_effector_fixtures.ex:489-505``):
+* propose:
   ``{"principal", "act_type", "act_hash", "act_hash_alg": "sha384+canonical_payload.v3",
   "display": <the arguments object>}``; optional ``class``, ``exp``; ``arm_statement_id`` is refused
-  on a row with no ``arm_link`` (``sanction_requests.ex:160-162``). No nonce, no idempotency key.
-* execute (``execute.ex:99-100``; the fixture ``execute_api_effector_fixtures.ex:552-562``):
+  on a row with no ``arm_link``. No nonce, no idempotency key.
+* execute:
   ``{"principal", "act_type", "act_hash", "act_hash_alg", "display_projection": <the same arguments
-  object>, "statement_id", "nonce", "not_after"}``. ``nonce`` matches ``[A-Za-z0-9_-]{1,128}``
-  (``execute.ex:103``); ``not_after`` is ``YYYY-MM-DDTHH:MM:SSZ`` in ``(now, now + 300 s]``
-  (``execute.ex:193-202``, ``ids.ex:30-45``). The nonce claim is unique per (caller, nonce) and holds
-  the SHA-256 of the body's canonical bytes (``execute.ex:335-368``, ``ids.ex:47-54``): the same body
+  object>, "statement_id", "nonce", "not_after"}``. ``nonce`` matches ``[A-Za-z0-9_-]{1,128}``;
+  ``not_after`` is ``YYYY-MM-DDTHH:MM:SSZ`` in ``(now, now + 300 s]``.
+  The nonce claim is unique per (caller, nonce) and holds
+  the SHA-256 of the body's canonical bytes: the same body
   again is the exact retry (the stored decision); a different body is
   ``nonce_reused_with_different_body`` (409).
-* every refusal before a decision is ``{"error": <code>}`` with the code's HTTP status
-  (``v1/errors.ex:48-73``, ``codes.ex:37-85``); signed denies come back 200 with ``verdict: "deny"``.
+* every refusal before a decision is ``{"error": <code>}`` with the code's HTTP status;
+  signed denies come back 200 with ``verdict: "deny"``.
 
 Additions not in the Requisition version of 2026-10-26 (their shapes are the planned ones, not read from code):
 
@@ -45,8 +45,8 @@ Additions not in the Requisition version of 2026-10-26 (their shapes are the pla
   envelope over the SAME signed bytes, announced by the signed ``metadata.cosign``.
 
 Detection: that version answers ``GET /v1/sanction-requests`` (with or without a query)
-405 ``method_not_allowed`` (``router.ex:121``: ``match(_method, ["sanction-requests"])``) and
-``POST /v1/outcomes`` 404 ``route_unknown`` (``router.ex:124``). Either answer means "not
+405 ``method_not_allowed`` (a known path under another method) and
+``POST /v1/outcomes`` 404 ``route_unknown``. Either answer means "not
 supported": the client remembers it and falls back to today's behaviour (no ``idempotency_key``,
 no lookup, no outcome). ``idempotency_key`` is sent only after the lookup route answered 200, since
 today's propose refuses an unknown member (``member_out_of_schema``).
@@ -69,13 +69,13 @@ from typing import Any
 
 from . import canonical
 
-NONCE_FORM = re.compile(r"\A[A-Za-z0-9_-]{1,128}\Z")  # execute.ex:103
-INSTANT_FORM = re.compile(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")  # ids.ex:9-10
+NONCE_FORM = re.compile(r"\A[A-Za-z0-9_-]{1,128}\Z")  # the nonce form Requisition accepts at execute
+INSTANT_FORM = re.compile(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")  # Requisition's instant form
 UUID_FORM = re.compile(r"\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z")
-NOT_AFTER_WINDOW = 300  # execute.ex:102
+NOT_AFTER_WINDOW = 300  # seconds: Requisition's bound on not_after
 HEX64 = re.compile(r"\A[0-9a-f]{64}\Z")
 HEX96 = re.compile(r"\A[0-9a-f]{96}\Z")
-# the answers that mean "this server predates the route" (router.ex:105-124 in the Requisition version of 2026-10-26)
+# the answers that mean "this server predates the route" (the Requisition version of 2026-10-26)
 UNSUPPORTED = {(404, "route_unknown"), (405, "method_not_allowed")}
 OUTCOMES = ("succeeded", "failed")
 
@@ -99,7 +99,7 @@ class RequisitionRefused(RequisitionError):
 
 
 def instant(t: _dt.datetime) -> str:
-    """The spec's instant spelling (ids.ex:30-32)."""
+    """The spec's instant spelling."""
     return t.astimezone(_dt.timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -127,7 +127,7 @@ def _finite_float(lexeme: str) -> float:
     return value
 
 
-MAX_DEPTH = 64  # containers; the 65th is refused (requisition-ts src/json.ts MAX_DEPTH; lab_key_rule.ex decode_bounded/1)
+MAX_DEPTH = 64  # containers; the 65th is refused (requisition-ts src/json.ts MAX_DEPTH; Requisition's bounded JSON reader has the same bound)
 MAX_INTEGER = 9_007_199_254_740_991  # CanonicalPayload v3's integer range (canonical.MAX_INTEGER)
 
 
@@ -161,12 +161,12 @@ def _bounded_int(lexeme):
 def loads_strict(data: bytes | str) -> Any:
     """RFC 8259 JSON text, refusing what Python's json accepts beyond it (requisition-ts
     src/json.ts is the same reader):
-    * duplicate members (the router refuses them inbound too, router.ex:202-208);
+    * duplicate members (Requisition refuses them inbound too);
     * NaN, Infinity and -Infinity (RFC 8259 section 6), and any number whose value is not a finite double;
     * bytes that are not UTF-8 (section 8.1): never Python's UTF-16/UTF-32 detection nor its surrogatepass
       decoding of an encoded surrogate; a byte order mark is refused (json.loads refuses U+FEFF in text);
     * nesting deeper than MAX_DEPTH (64) containers, and an integer outside +-(2^53-1), the range CanonicalPayload v3
-      allows (one bound, the same in requisition-ts and lab_key_rule.ex decode_bounded/1).
+      allows (one bound, the same in requisition-ts and in Requisition's bounded JSON reader).
     Every refusal is a ValueError (never a RecursionError)."""
     return _loads(data, _bounded_int)
 
@@ -226,7 +226,7 @@ def plaintext_allowed(host: str, allow_private: bool) -> bool:
 class Client:
     """``base_url`` such as ``https://requisition.example`` (``http://`` only to loopback, or to a
     private IP literal with ``allow_plaintext_private``). ``unix_socket``: once Requisition's socket is
-    configured, ``/v1`` answers only on it (router.ex:19-23); pass its path then."""
+    configured, ``/v1`` answers only on it; pass its path then."""
 
     base_url: str
     credential: str
@@ -299,7 +299,7 @@ class Client:
 
     def propose_body(self, act_type: str, args: dict, *, class_: str | None = None,
                      idempotency_key: str | None = None) -> bytes:
-        """The propose body's bytes for an argument row (sanction_requests.ex:75-76); with
+        """The propose body's bytes for an argument row; with
         ``idempotency_key`` only when the server is known to take it."""
         body = {
             "principal": self.principal,
@@ -338,7 +338,7 @@ class Client:
     def execute_body(
         self, act_type: str, args: dict, statement_id: str, nonce: str, not_after: str
     ) -> bytes:
-        """The execute body's bytes (execute.ex:99-100). Stored and replayed verbatim on retry."""
+        """The execute body's bytes. Stored and replayed verbatim on retry."""
         if not NONCE_FORM.match(nonce or ""):
             raise ValueError("nonce must match [A-Za-z0-9_-]{1,128}")
         if parse_instant(not_after) is None:
@@ -428,7 +428,7 @@ class Client:
         return self._optional("outcomes", "POST", "/v1/outcomes", body, (200, 201))
 
     def keys(self) -> bytes:
-        """``GET /v1/keys``: the lab key file's bytes (router.ex:251-264). No credential is sent."""
+        """``GET /v1/keys``: the lab key file's bytes. No credential is sent."""
         status, raw = self._request("GET", "/v1/keys", None, auth=False)
         if status != 200:
             raise RequisitionUnavailable(f"GET /v1/keys answered HTTP {status}")

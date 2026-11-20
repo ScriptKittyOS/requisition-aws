@@ -8,7 +8,7 @@ Two rules, nothing else:
 
 * **Position memory (evidence).** Every signed record the relying party reads (the statement, the
   decision, the outcome record) is remembered by its SIGNED ``(chain_scope, sequence)`` (both inside
-  the signed bytes: requisition ``lab_records.ex:234-252``) together with the record itself. A record
+  the signed bytes) together with the record itself. A record
   presented at a remembered position with a different ``receipt_hash`` is refused
   ``authority_equivocated``, and both records are saved as one evidence entry: two records signed by
   the lab key at one chain position, which anyone can check offline (``bin/verify_chain.py`` reads the

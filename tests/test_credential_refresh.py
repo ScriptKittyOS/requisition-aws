@@ -15,7 +15,7 @@ Measured before these tests:
 * the claim (``gate.claim``) and the pass-through come AFTER the last Requisition call, so a refused
   credential always stops the flow before the claim: retrying the whole invocation can never claim twice.
 * Requisition answers 401 ``caller_credential_expired`` / ``caller_credential_revoked`` (only after the
-  secret matched) or ``caller_unauthenticated`` (codes.ex:39-40, caller_credentials.ex:24-25).
+  secret matched) or ``caller_unauthenticated``.
 
 The interface the tests pin: ``Interceptor(..., credential_source=<callable returning the credential
 read fresh from its source>, reread_interval=<seconds>, monotonic=<clock>)``.

@@ -2,8 +2,8 @@
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """The offline verifier a stranger runs (bin/verify_offline.py) carries no workflow wording: no private path, no
 name of who runs what, no review round or ruling number, no internal gap, issue, plan or finding id, no agent name or
-trailer, no session link. The list is Requisition's verifier wording census's (its
-test/autonomous_agency/authority/verifier_wording_census_test.exs), one pattern per name. One exception by value:
+trailer, no session link. The list is that of Requisition's verifier wording census,
+one pattern per name. One exception by value:
 the hands label Requisition signs into every lab record.
 
 Every pattern below is split into pieces, so that this file does not match itself."""
@@ -22,7 +22,7 @@ PATTERNS = {
     "lane": re.compile(r"\bla" + r"nes?\b", re.I),
     "builder": re.compile(r"\bbuil" + r"ders?\b", re.I),
     "reviewer": re.compile(r"\brevie" + r"wers?\b", re.I),
-    "review_name": re.compile(r"\b(build|reds|crypto|delta|stack|landed|code) rev" + r"iews?\b|\brev" + r"iew (item|[0-9])|\bS[0-9]{2} rev"
+    "review_name": re.compile(r"\b(build|reds|crypto|delta|stack|lan" + r"ded|code) rev" + r"iews?\b|\brev" + r"iew (item|[0-9])|\bS[0-9]{2} rev"
                               + r"iew\b", re.I),
     "round": re.compile(r"\b(review|fix|delta|first|second|third|next|last) rou" + r"nds?\b|\brou" + r"nd[ -]?[0-9]+\b", re.I),
     "owners_go": re.compile(r"\bowner'?s (own-words )?(g" + r"o|o" + r"k)\b|\bgo from the own" + r"er\b", re.I),

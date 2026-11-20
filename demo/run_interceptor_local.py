@@ -7,7 +7,8 @@ fetched 2026-11-09; see tests/fixtures/interceptor/) and hands it to the same `I
 Lambda entry point calls. No Gateway, no Lambda, no AWS call: this shows what the handler returns to
 the Gateway at each step. What a live Gateway does with it is AWS's documented contract, not tested here.
 
-    export REQUISITION_URL=http://127.0.0.1:4103 REQUISITION_CRED=... REQUISITION_PRINCIPAL=...
+    export REQUISITION_URL=http://127.0.0.1:4000 REQUISITION_CRED=... REQUISITION_PRINCIPAL=...
+    export REQUISITION_SEED=/path/to/seed.json # required: the file the server registered the act type from
     uv run python demo/run_interceptor_local.py --transcript <dir>/interceptor.md
 """
 
@@ -25,7 +26,7 @@ import uuid
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 from requisition_aws import interceptor as icp
-from requisition_aws.demo_flow import Transcript, demo_dir, verify_all
+from requisition_aws.demo_flow import Transcript, demo_dir, demo_seed, verify_all
 
 TOOL = "refunds___payments_refund_send"
 # A labelled placeholder (G1): the SigV4 Authorization shape a Gateway forwards under
@@ -33,6 +34,12 @@ TOOL = "refunds___payments_refund_send"
 PLACEHOLDER_AUTHORIZATION = ("AWS4-HMAC-SHA256 Credential=AKIAPLACEHOLDERLOCAL/20261110/us-west-2/bedrock-agentcore/"
                              "aws4_request, SignedHeaders=host, Signature=PLACEHOLDER-NOT-A-SIGNATURE")
 PLACEHOLDER_NOTE = "caller key from a placeholder header — local run, not authenticated (no Gateway)"
+
+
+def approvals_link(env) -> str:
+    """The console page the two approvers open: the base the interceptor builds its own links from
+    (REQUISITION_APPROVAL_BASE when set, REQUISITION_URL otherwise)."""
+    return env.get("REQUISITION_APPROVAL_BASE", env["REQUISITION_URL"]).rstrip("/") + "/approvals"
 
 
 def event(rpc_id, method, params=None, session="mcp-session-local"):
@@ -81,7 +88,7 @@ def main() -> int:
     env = {**os.environ,
            "REQUISITION_GATEWAY_ID": "local-gateway-demo",
            "REQUISITION_TOOLS": json.dumps({TOOL: "payments.refund_send"}),
-           "REQUISITION_SEED": str(DEMO / "req" / "lab" / "seed" / "aws_demo.v1.json"),
+           "REQUISITION_SEED": demo_seed(),
            "REQUISITION_STORE": str(store),
            "REQUISITION_AGENT": "agentcore-gateway-demo",
            "REQUISITION_KEYS_FILE": os.environ["REQUISITION_LAB_KEY_FILE"]}
@@ -122,7 +129,7 @@ def main() -> int:
     for label, ev in steps:
         t.say(label); t.say("   " + summarize(it.handle(ev)))
 
-    t.say("   -> two approver accounts approve it in the console: http://127.0.0.1:4103/approvals")
+    t.say("   -> two approver accounts approve it in the console: " + approvals_link(env))
     deadline = time.time() + a.timeout
     while time.time() < deadline:
         out = it.handle(event(4, "tools/call", refund, session))

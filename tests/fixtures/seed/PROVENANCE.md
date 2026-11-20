@@ -2,8 +2,8 @@
 
 `aws_demo.v1.json` is the seed file (last written 2026-11-09) from which the demo lab registers
 `payments.refund_send` (README, "Running the demo", precondition 1), in Requisition's `requisition.lab.seed.v1`
-format; the demos read it as `$REQUISITION_DEMO_DIR/req/lab/seed/aws_demo.v1.json`. It is
-in no Requisition commit. Its top-level `note`, which pointed at a private planning document, is left out; `schema`,
+format; the demos read the seed file the operator names (`--seed`, or `REQUISITION_SEED`), and a dry rehearsal
+reads this copy. It is in no Requisition commit. Its top-level `note`, which pointed at a private planning document, is left out; `schema`,
 `set` and `act_types` are unchanged. The sha256 of `act_types` written as sorted, compact JSON is the same in the
 original and here:
 

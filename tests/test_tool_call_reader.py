@@ -78,6 +78,7 @@ BOUNDED_READS = {
     ("requisition_aws/interceptor.py", "caller_from_env"),
     ("requisition_aws/keys.py", "_occurred_at"),
     ("requisition_aws/keys.py", "_parse"),
+    ("requisition_aws/settings.py", "json_map"),
 }
 
 

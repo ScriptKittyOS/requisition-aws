@@ -50,6 +50,28 @@ def test_encoder_parity_with_the_package_on_the_elixir_corpus():
         assert vo.encode(term) == canonical.encode(term) == base64.b64decode(answer)
 
 
+# A value the version 3 encoder refuses, and the name the package's encoder gives the refusal. The verifier's copy
+# gives the same name: a caller that reads the code gets one vocabulary from both.
+V3_REFUSALS = [
+    ({"amount": 12.5}, "float_refused"),
+    ({"amounts": [1, 2.0]}, "float_refused"),
+    ({"a": {"b": float("nan")}}, "float_refused"),
+    ({1: "a number as a member name"}, "non_string_key"),
+    ({"when": object()}, "unencodable"),
+    ({"note": "\ud800"}, "invalid_string"),
+    ({"\udfff": 1}, "invalid_string"),
+]
+
+
+@pytest.mark.parametrize("value, code", V3_REFUSALS, ids=[code + " " + str(n) for n, (_, code) in enumerate(V3_REFUSALS)])
+def test_a_version_3_refusal_carries_the_name_the_package_gives_it(value, code):
+    with pytest.raises(canonical.CanonicalRefusal) as package:
+        canonical.encode(value)
+    with pytest.raises(vo.Refused) as verifier:
+        vo.encode(value)
+    assert package.value.code == code and verifier.value.code == code
+
+
 def test_demo_args_hash_and_digest_match_the_package():
     args = arguments_object("refund-agent", "s-1", ACT_TYPE, refund_args())
     assert vo.act_hash(ACT_TYPE, args) == canonical.act_hash(ACT_TYPE, args)
@@ -316,3 +338,20 @@ def test_both_signatures_verified_is_not_said_when_lab_verify_did_not_pass(tmp_p
         server.stop()
     assert proc.returncode == 3, proc.stdout
     assert "both signatures verified" not in proc.stdout, proc.stdout
+
+
+@needs_mldsa_fake
+@pytest.mark.parametrize("status", [5, 0])
+def test_an_unchecked_answer_with_another_status_fails_the_lab_half(pq_records, tmp_path, status):
+    """bin/lab-verify's answer for an ML-DSA-87 record whose signature it did not check is lab_signature_unchecked_mldsa87
+    with exit 7; the same code with any other status (5, the status of a checked pass; 0) is not that answer: exit 3,
+    and the FAIL line names the status it came with."""
+    stand_in = tmp_path / "lab-verify"
+    stand_in.write_text("import sys\nprint('verdict_code: lab_signature_unchecked_mldsa87')\nsys.exit(%d)\n" % status)
+    proc = subprocess.run(
+        [sys.executable, "-I", str(SCRIPT), "--arguments", str(pq_records["args"]), "--act-type", ACT_TYPE,
+         "--record", str(pq_records["allow"]), "--lab-verify", str(stand_in), "--registry", str(pq_records["registry"])],
+        capture_output=True, text=True, timeout=120)
+    assert proc.returncode == 3, proc.stdout
+    assert ("verdict: FAIL (lab-verify answered lab_signature_unchecked_mldsa87 with exit %d, not 7, for this record's "
+            "signed signer" % status) in proc.stdout, proc.stdout

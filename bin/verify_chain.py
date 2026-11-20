@@ -5,20 +5,20 @@
 signed records kept outside it (F1b).
 
     python3 -I bin/verify_chain.py --registry LAB-KEYS.json --export EXPORT [--held FILE]... \
-        [--require-pq] [--json]
+        [--require-pq] [--at TIME] [--json]
 
 EXPORT      one account chain's stored rows, ordered by sequence: the CSV bin/export_chain.sh writes
             (header chain_scope,sequence,signature,key_id,signed_payload,receipt_hash,cosignature,
             cosignature_key_id) or JSON {"records": [row, ...]} (or a bare list), each row a four-field
             envelope or {"record": envelope, "cosignature": envelope}. Every position is read from the
-            SIGNED payload (requisition schema/lab_receipt.ex: signed_payload is authoritative); the
+            SIGNED payload (in Requisition's record store signed_payload is authoritative); the
             other columns are lookup copies and are not trusted.
 --held FILE signed records kept outside the store: an envelope; {"record"|"statement"|"decision":
             envelope, "cosignature": ...}; a list of those; {"records": [...]}; or a relying party's
             equivocation evidence entry {"held": envelope, "presented": envelope} (or {"evidence":
             [entries]}, as requisition_aws.Store.evidence() returns them). Identical copies are one.
 LAB-KEYS    the key file GET /v1/keys serves (lab keys: NOT a trust root). THE KEY RULE (one rule in
-            every verifier, requisition lib/autonomous_agency/authority/execute_api/lab_key_rule.ex is its text and
+            every verifier, the issuing server's key rule is its text and
             tests/vectors/key_rule_vectors.v1.json its vectors): a record verifies under a key iff, in this order,
             the key is not compromised/revoked (key_revoked), is active or retired (key_status_unusable), has a
             readable window (key_window_unreadable; a retired key needs a valid_to), the record's signed occurred_at
@@ -33,8 +33,8 @@ Signatures: Ed25519 by bin/vendor/ed25519_rfc8032.py (a pinned byte copy of the 
 receipt verifier published in receipt-verification r4); ML-DSA-87 by bin/vendor/mldsa.py (pinned). Both are loaded by path and refused unless
 their SHA-256 is the pinned one (bin/vendor/VENDORED.md).
 
---require-pq: every AGENT-TOOL record -- one whose signed metadata carries "cosign" (requisition
-lab_records.ex:44-64: only an agent-tool row's statement, decision and outcome; every other record has
+--require-pq: every AGENT-TOOL record -- one whose signed metadata carries "cosign" (Requisition signs it
+into only an agent-tool row's statement, decision and outcome; every other record has
 none) -- needs a valid ML-DSA-87 signature over its own bytes (its own, or the co-signature whose bytes,
 hash and key id match the signed cosign member). Other records are reported "Ed25519 only".
 
@@ -65,6 +65,22 @@ WHAT IT JUDGES: the export it is given. A stranger needs the operator's export o
 records; an operator who hands over an old dump passes against nothing newer. A claim about the live
 service waits for checkpoints. Lab profile, lab key: two records at one position prove that the
 holder of that key signed two histories.
+
+WHAT A PASS SAYS. Result "ok" ends, after the RESULT line, with one fixed sentence (PASS_LINE, the same text in every
+Requisition verifier): a pass shows the bytes were signed under the key supplied, and it is not permission to act.
+Before the RESULT line, each export row whose signed bytes carry a deadline is reported as what the record says, for
+two kinds of record and no other: a decision that allowed (the signed verdict is "allow"; its deadline is the signed
+metadata's exec_not_after, or not_after when that is absent), "sequence N: This decision allowed execution until
+<time>.", and a statement (a statement record with no signed verdict, and exp; its deadline is exp), "sequence N:
+This statement was valid until <time>.", each followed by "sequence N: No time was compared." A record with no signed
+verdict and no exp, such as a caller grant, and a record of another kind that signs exp, have no window. With --at TIME (one instant, YYYY-MM-DDTHH:MM:SSZ; any other value is a usage error,
+exit 2) the second line says instead whether that record's window was open at that instant: from its start (a
+decision's decided_at, a statement's nbf) up to, and not at, the deadline, by comparing the signed text; a record that
+signs no start has only its end compared, and the line says so. No exit and no result depends on a time: an expired
+decision is still a valid record. A FAIL prints neither the sentence nor these lines. --json carries them as fixed
+members: "notice" (the sentence when the result is ok, else null), "at" (the time given, else null) and "windows" (one
+{"sequence", "receipt_hash", "lines"} per export row that has lines; empty on a FAIL).
+tests/vectors/pass_lines_vectors.v1.json holds the rows of the rule.
 
 EXIT: 0 ok; 1 FAIL; 2 usage, an unreadable input, or a scope that is not an account chain.
 Standard library and the two pinned vendored files only.
@@ -133,7 +149,7 @@ def key_standing(entry, occurred_at, accept_signers=None):
     return None
 
 
-# --- ED25519 KEY MATERIAL: one text in keys.py, verify_chain.py, bin/lab-verify and bin/lab-log-verify ---
+# --- ED25519 KEY MATERIAL: one text in keys.py, verify_chain.py, bin/lab-verify and Requisition's log checker ---
 # edwards25519 (RFC 8032 section 5.1): p, the prime group order L, d, and sqrt(-1) = 2^((p-1)/4)
 _P = 2**255 - 19
 _L = 2**252 + 27742317777372353535851937790883648493
@@ -327,7 +343,7 @@ def _finite_float(lexeme):
     return value
 
 
-MAX_DEPTH = 64  # containers; the 65th is refused (requisition-ts src/json.ts MAX_DEPTH; lab_key_rule.ex decode_bounded/1)
+MAX_DEPTH = 64  # containers; the 65th is refused (requisition-ts src/json.ts MAX_DEPTH; Requisition's bounded JSON reader has the same bound)
 MAX_INTEGER = 9_007_199_254_740_991  # CanonicalPayload v3's integer range (canonical.MAX_INTEGER)
 
 
@@ -616,6 +632,99 @@ def verify(export_rows, held_rows, verifiers, require_pq):
 # --- main ----------------------------------------------------------------------------------------
 
 
+# --- WHAT A PASS SAYS: one text in verify_receipt.py, bin/lab-verify, verify_offline.py and verify_chain.py ---
+# A pass is a statement about bytes and a key, and PASS_LINE says so after the verdict. A deadline the signed bytes
+# carry is reported as what the record says, never compared with a clock, for two kinds of record and no other. The
+# kind is read from the signed bytes (window_kind): a decision that allowed carries the verdict "allow" in its
+# metadata (WINDOW_DECISION: its deadline is exec_not_after, or not_after when that is absent, and its start is
+# decided_at); a statement is a record whose signed receipt_type is WINDOW_STATEMENT_TYPE and whose metadata carries
+# no verdict member and carries exp (WINDOW_STATEMENT: its deadline is exp, its start nbf). Every other record has no
+# window: a verdict that is not "allow" allowed nothing, a record of another kind that signs exp and no verdict is no
+# statement, and a record with no verdict and no exp is neither kind (a caller grant signs not_after, the day the
+# grant ends, which is no deadline for an execution). With an instant given (--at), that instant is compared with the signed values as text, which is
+# chronological order for the one accepted form: the window is open from its start (a record that signs none has
+# only its end compared) up to, and not at, its end. A member that is present and is not an instant of the accepted
+# form is said so and is never compared. No exit depends on any of it.
+PASS_LINE = (
+    "A pass shows these bytes were signed under the key you supplied. It is not permission to act. "
+    "Whether an action may run is decided by the issuing system when it runs."
+)
+# each kind: (the sentence its deadline is reported in, the members read as its end, the members read as its start)
+WINDOW_DECISION = ("This decision allowed execution until %s.", ("exec_not_after", "not_after"), ("decided_at",))
+WINDOW_STATEMENT = ("This statement was valid until %s.", ("exp",), ("nbf",))
+# the signed receipt_type of a statement record, the only kind whose exp is reported
+WINDOW_STATEMENT_TYPE = "requisition.lab.statement.v0"
+WINDOW_INSTANT_SHAPE = "dddd-dd-ddTdd:dd:ddZ"
+
+
+def window_instant(value):
+    """True for exactly YYYY-MM-DDTHH:MM:SSZ (ASCII digits) that is a real instant of the proleptic Gregorian
+    calendar: month 01 to 12, a day that month has in that year, hour 00 to 23, minute and second 00 to 59."""
+    if not (isinstance(value, str) and len(value) == 20
+            and all((c in "0123456789") if m == "d" else c == m for c, m in zip(value, WINDOW_INSTANT_SHAPE))):
+        return False
+    year, month, day = int(value[0:4]), int(value[5:7]), int(value[8:10])
+    if month < 1 or month > 12 or int(value[11:13]) > 23 or int(value[14:16]) > 59 or int(value[17:19]) > 59:
+        return False
+    leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+    return 1 <= day <= (31, 29 if leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[month - 1]
+
+
+def window_kind(signed, metadata):
+    """WINDOW_DECISION, WINDOW_STATEMENT or None: the kind of record a deadline is reported for. A signed verdict
+    decides alone: a record that carries one is a decision, and it allowed only when the verdict is the text
+    "allow". A record that carries none is a statement when its signed receipt_type is WINDOW_STATEMENT_TYPE and it
+    carries exp, and is neither kind otherwise."""
+    if "verdict" in metadata:
+        return WINDOW_DECISION if metadata["verdict"] == "allow" else None
+    if signed.get("receipt_type") != WINDOW_STATEMENT_TYPE:
+        return None
+    return WINDOW_STATEMENT if "exp" in metadata else None
+
+
+def window_lines(signed, at=None):
+    """The lines about the record's window that follow PASS_LINE; `at` is None or an accepted instant."""
+    if not isinstance(signed, dict):
+        signed = {}
+    metadata = signed.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+    sentence, end_names, start_names = window_kind(signed, metadata) or (None, (), ())
+    end_name = next((name for name in end_names if name in metadata), None)
+    if end_name is None:
+        return [] if at is None else ["No time was compared: this record carries no execution window."]
+    end = metadata[end_name]
+    if not window_instant(end):
+        return [
+            "The signed %s is not a readable instant, so no deadline is reported." % end_name,
+            "No time was compared." if at is None
+            else "No time was compared: the signed %s is not a readable instant." % end_name,
+        ]
+    lines = [sentence % end]
+    if at is None:
+        return lines + ["No time was compared."]
+    start_name = next((name for name in start_names if name in metadata), None)
+    if start_name is None:
+        if at < end:
+            return lines + ["At %s the window was open (until %s; the record signs no start, so none was compared)." % (at, end)]
+        return lines + ["At %s the window was closed (it ended at %s)." % (at, end)]
+    start = metadata[start_name]
+    if not window_instant(start):
+        return lines + ["No time was compared: the signed %s is not a readable instant." % start_name]
+    if at < start:
+        return lines + ["At %s the window was closed (it opened at %s)." % (at, start)]
+    if at >= end:
+        return lines + ["At %s the window was closed (it ended at %s)." % (at, end)]
+    return lines + ["At %s the window was open (from %s, until %s)." % (at, start, end)]
+# --- end of WHAT A PASS SAYS ---
+
+
+def _at(value):
+    if not window_instant(value):
+        raise argparse.ArgumentTypeError("--at takes one instant of the form YYYY-MM-DDTHH:MM:SSZ")
+    return value
+
+
 def _signer_label(value):
     if not value:
         raise argparse.ArgumentTypeError("an empty signer label is a configuration error")
@@ -623,12 +732,14 @@ def _signer_label(value):
 
 
 def main(argv):
-    parser = argparse.ArgumentParser(prog="verify_chain.py", description=__doc__.split("\n\n")[0])
+    # allow_abbrev=False: a flag is taken only by its whole name, as in every other Requisition verifier
+    parser = argparse.ArgumentParser(prog="verify_chain.py", description=__doc__.split("\n\n")[0], allow_abbrev=False)
     parser.add_argument("--registry", required=True)
     parser.add_argument("--export", required=True)
     parser.add_argument("--held", action="append", default=[])
     parser.add_argument("--require-pq", action="store_true")
     parser.add_argument("--accept-signer", action="append", default=None, metavar="LABEL", type=_signer_label)
+    parser.add_argument("--at", default=None, metavar="TIME", type=_at)
     parser.add_argument("--json", action="store_true")
     try:
         args = parser.parse_args(argv)
@@ -648,11 +759,22 @@ def main(argv):
         sys.stderr.write("verify_chain: unreadable input (%s: %s)\n" % (type(error).__name__, error))
         return EXIT_USAGE
     result = "ok" if not report.failures else "FAIL"
+    # WHAT A PASS SAYS: on "ok" every export row verified, so its signed bytes are read for the window they carry.
+    windows = []
+    if result == "ok":
+        for row in export_rows:
+            signed = _json(row["record"]["signed_payload"])
+            lines = window_lines(signed, args.at)
+            if lines:
+                windows.append({"sequence": signed.get("sequence"), "receipt_hash": row["record"]["receipt_hash"],
+                                "lines": lines})
     if args.json:
         sys.stdout.write(json.dumps({"result": result, "chain_scope": scope, "failures": report.failures,
                                      "notes": report.notes, "export_rows": len(export_rows),
                                      "held_records": sum(len(r) for _, r in held_rows),
-                                     "require_pq": args.require_pq}, indent=1) + "\n")
+                                     "require_pq": args.require_pq,
+                                     "notice": PASS_LINE if result == "ok" else None, "at": args.at,
+                                     "windows": windows}, indent=1) + "\n")
     else:
         print("chain scope: %s (%d export rows, %d held records)" % (scope, len(export_rows),
                                                                       sum(len(r) for _, r in held_rows)))
@@ -662,7 +784,12 @@ def main(argv):
             print("FAIL %s at sequence %s: %s" % (f["code"], f["sequence"], f["detail"]))
             for r in f["records"]:
                 print("    %s receipt_hash %s (%s)" % (f["code"], r["receipt_hash"], r["source"]))
+        for window in windows:
+            for line in window["lines"]:
+                print("sequence %s: %s" % (window["sequence"], line))
         print("RESULT " + result)
+        if result == "ok":
+            print(PASS_LINE)
     return EXIT_OK if result == "ok" else EXIT_FAIL
 
 

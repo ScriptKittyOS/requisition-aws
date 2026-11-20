@@ -7,15 +7,16 @@
 #
 # Writes the stored rows of authority_lab_receipts for that one scope, ordered by sequence, as CSV with a
 # header: chain_scope,sequence,signature,key_id,signed_payload,receipt_hash,cosignature,cosignature_key_id
-# (columns per requisition schema/lab_receipt.ex; signed_payload is the exact signed bytes, and
+# (the columns of Requisition's lab record table; signed_payload is the exact signed bytes, and
 # verify_chain.py reads every position from it, never from the lookup columns).
 #
 # Read only, three ways: the session default (PGOPTIONS default_transaction_read_only=on), an explicit
 # READ ONLY transaction, and one SELECT inside COPY ... TO STDOUT (client side; no server file, no
 # superuser). The scope reaches psql only as a variable (-v scope=...; :'scope' quotes it as a literal),
 # and is checked against the account form first: anything else exits 2 before psql runs. Connection
-# settings come from the libpq environment (PGDATABASE, PGHOST, ...; a password from ~/.pgpass, never
-# the command line). Point it at a bin/scratch-db copy or the demo database -- never a database in use.
+# settings come from the libpq environment (PGDATABASE, PGHOST, ...; a password from the libpq password file, never
+# the command line). Point it at a copy made by Requisition's scratch-database wrapper, or at the demo database --
+# never a database in use.
 set -euo pipefail
 
 scope="${1-}"

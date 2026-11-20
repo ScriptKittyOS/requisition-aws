@@ -1,7 +1,7 @@
 # canonical_payload.v4 vectors (a byte copy)
 
 `vectors.jsonl` and `negative/cases.jsonl` are byte copies of the files of the same name in the `requisition`
-repository, `test/support/fixtures/canonical_v4/`. They are generated there (`generate.mjs`); the sources of every
+repository's canonical version 4 fixture folder. They are generated there (`generate.mjs`); the sources of every
 row, the third-party rows (Probity agent-evidence-vectors, Apache-2.0, commit
 `13247ea551e470fb57413fdfab4f2738147613a1`) and what was not copied are in that directory's `SOURCES.md`.
 
@@ -11,4 +11,4 @@ row, the third-party rows (Probity agent-evidence-vectors, Apache-2.0, commit
 | `negative/cases.jsonl` | `ef5a499a9ed1e8fe336eee104e49457f9e157c4b760a8f46e1d2948c0964d669` |
 
 Never edit these here. The runner in this repository pins both digests; `requisition`'s
-`bin/canonical-v4-differential` checks the copies byte for byte before it runs the four runners.
+differential tool checks the copies byte for byte before it runs the four runners.

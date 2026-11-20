@@ -28,6 +28,8 @@ It is tested and versioned with the interceptor.
 ``REQUISITION_AGENT``, ``REQUISITION_APPROVAL_BASE``, ``REQUISITION_TIMEOUT``, ``REQUISITION_KEYS_FILE``,
 ``REQUISITION_KEYS_SHA256``, ``REQUISITION_PRINCIPAL_EXPECTED``, ``REQUISITION_REQUIRE_PQ``,
 ``REQUISITION_ALLOW_PLAINTEXT_PRIVATE``, and optionally ``REQUISITION_CRED_REREAD_SECONDS``.
+``REQUISITION_PRINCIPAL_EXPECTED`` is required and must be a principal id (``rqp_`` and 32 lower-case hex digits):
+otherwise every request is refused before the secret is read.
 """
 
 from __future__ import annotations
@@ -39,6 +41,7 @@ import os
 from typing import Any
 
 from requisition_aws import interceptor as _interceptor
+from requisition_aws import settings as _settings
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -64,14 +67,14 @@ def _check_keys_pin() -> None:
 
 def _read_caller() -> tuple[str, str]:
     """The caller secret, read from Secrets Manager now (never from a cache): (credential, principal)."""
+    expected = _settings.principal_id(os.environ, "REQUISITION_PRINCIPAL_EXPECTED")
     raw = _secrets_client().get_secret_value(SecretId=os.environ["REQUISITION_SECRET_ARN"])["SecretString"]
     value = json.loads(raw)
     credential = value.get("credential") if isinstance(value, dict) else None
     principal = value.get("principal") if isinstance(value, dict) else None
     if not (isinstance(credential, str) and credential.startswith("rqc_") and isinstance(principal, str) and principal):
         raise ValueError("the caller secret is not minted yet")
-    expected = os.environ.get("REQUISITION_PRINCIPAL_EXPECTED", "")
-    if expected and principal != expected:
+    if principal != expected:
         raise ValueError("the caller secret names another principal than the stack pins")
     return credential, principal
 
@@ -106,7 +109,7 @@ def handler(event: Any, context: Any) -> dict:
             _load_caller()
             _CALLER_LOADED = True
         except Exception as error:  # noqa: BLE001 - any failure refuses the call
-            log.error("requisition interceptor: caller credential unavailable (%s)", type(error).__name__)
+            log.error("requisition interceptor: caller credential unavailable (%s)", _settings.log_reason(error))
             return _interceptor.rpc_error(
                 _rpc_id(event), _interceptor.FAIL_CLOSED,
                 "Requisition interceptor: caller credential unavailable; the call is refused (fail closed)")

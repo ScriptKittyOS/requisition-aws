@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """Builders for the key-rule vector tests: ONE vector file (tests/vectors/key_rule_vectors.v1.json, a byte copy
-of requisition's lab/requisition_key_rule_vectors.v1.json; the pin is tests/test_key_rule.py) becomes real signed
+of requisition's key-rule vector file; the pin is tests/test_key_rule.py) becomes real signed
 records under real keys, so every verifier is asked the same question with a signature that is valid."""
 
 import base64

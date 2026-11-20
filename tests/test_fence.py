@@ -84,7 +84,7 @@ def lab(clock):
 
 def gate_for(server, path, clock):
     client = Client(server.base_url, server.credential, server.principal, timeout=5)
-    return Gate(client, Store(str(path), clock=clock), approval_base_url="http://127.0.0.1:4103",
+    return Gate(client, Store(str(path), clock=clock), approval_base_url="http://127.0.0.1:4000",
                 keys=KeyRegistry.from_bytes(client.keys()), clock=clock)
 
 

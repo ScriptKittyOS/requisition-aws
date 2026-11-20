@@ -117,17 +117,23 @@ def test_the_flow_stops_when_records_were_appended_between_snapshot_and_mint(tmp
 
 @pytest.mark.parametrize("env", [
     {},
-    {"SCRATCH_DB": "autonomous_agency_dev", "PGDATABASE": "autonomous_agency_dev"},
-    {"SCRATCH_DB": "scratch_20261110120000_1_2", "PGDATABASE": "autonomous_agency_aws_demo2"},
+    {"SCRATCH_DB": "some_database", "PGDATABASE": "some_database"},
+    {"SCRATCH_DB": "scratch_20261110120000_1_2", "PGDATABASE": "demo_source"},
+    {"SCRATCH_DB": "scratch_2026_1_2", "PGDATABASE": "scratch_2026_1_2"},
+    {"SCRATCH_DB": "xscratch_20261110120000_1_2", "PGDATABASE": "xscratch_20261110120000_1_2"},
 ])
 def test_the_scratch_lab_refuses_anything_but_a_scratch_db_database(env, monkeypatch, tmp_path):
     for k in ("SCRATCH_DB", "PGDATABASE"):
         monkeypatch.delenv(k, raising=False)
     for k, v in env.items():
         monkeypatch.setenv(k, v)
-    with pytest.raises(demo.Refused):
-        demo.ScratchLab(source_db="autonomous_agency_aws_demo2", port=4113, server_cmd="true", out_dir=tmp_path,
+    with pytest.raises(demo.Refused, match="run me inside Requisition's scratch-database wrapper"):
+        demo.ScratchLab(source_db="demo_source", port=4113, server_cmd="true", out_dir=tmp_path,
                         t=Transcript())
+
+
+# a command as an operator gives it; the placeholders are the demo's ({wrapper}, {demo}, {port}, {serve})
+OPERATOR_SERVER_CMD = "{wrapper} bash -c 'source {demo}/env.sh && exec start-the-scratch-server --port {port} {serve}'"
 
 
 def test_the_scratch_lab_refuses_the_scratch_db_as_its_own_source(monkeypatch, tmp_path):
@@ -137,9 +143,15 @@ def test_the_scratch_lab_refuses_the_scratch_db_as_its_own_source(monkeypatch, t
         demo.ScratchLab(source_db="scratch_20261110120000_1_2", port=4113, server_cmd="true", out_dir=tmp_path, t=Transcript())
     monkeypatch.setenv("REQUISITION_DEMO_DIR", str(tmp_path))
     monkeypatch.setenv("REQUISITION_LOAD_WRAPPER", str(tmp_path / "limit.sh"))
-    lab = demo.ScratchLab(source_db="autonomous_agency_aws_demo2", port=4113, server_cmd=demo.DEFAULT_SERVER_CMD,
-                          out_dir=tmp_path, t=Transcript())
-    assert "4103" not in lab.server_cmd and "REQ_E2E_DB_NAME=\"$SCRATCH_DB\"" in lab.server_cmd
+    with pytest.raises(demo.Refused, match="--server-cmd"):  # no command is built in: the operator gives it
+        demo.ScratchLab(source_db="demo_source", port=4113, server_cmd="", out_dir=tmp_path, t=Transcript())
+    with pytest.raises(demo.Refused, match="--serve-script"):  # a command that names {serve} needs the script named
+        demo.ScratchLab(source_db="demo_source", port=4113, server_cmd=OPERATOR_SERVER_CMD, out_dir=tmp_path,
+                        t=Transcript())
+    lab = demo.ScratchLab(source_db="demo_source", port=4113, server_cmd=OPERATOR_SERVER_CMD,
+                          out_dir=tmp_path, t=Transcript(), live_ports=frozenset({4999}), serve="path/to/scratch-server-script")
+    assert "4999" not in lab.server_cmd and "--port 4113" in lab.server_cmd
+    assert lab.server_cmd.endswith("path/to/scratch-server-script'")
     assert lab.server_cmd.startswith(str(tmp_path / "limit.sh") + " bash -c ")
     assert "source " + str(tmp_path) + "/env.sh" in lab.server_cmd
 
@@ -147,8 +159,70 @@ def test_the_scratch_lab_refuses_the_scratch_db_as_its_own_source(monkeypatch, t
 def test_main_refuses_outside_scratch_db(monkeypatch, tmp_path):
     for k in ("SCRATCH_DB", "PGDATABASE"):
         monkeypatch.delenv(k, raising=False)
-    for k, v in {"REQUISITION_CRED": "c", "REQUISITION_PRINCIPAL": "p", "REQUISITION_LAB_KEY_FILE": "/nonexistent"}.items():
+    for k, v in {"REQUISITION_CRED": "rqc_dry_run_credential_0001", "REQUISITION_PRINCIPAL": "rqp_dry_run", "REQUISITION_LAB_KEY_FILE": "/nonexistent"}.items():
         monkeypatch.setenv(k, v)
     monkeypatch.setenv("REQUISITION_DEMO_DIR", str(tmp_path))
-    assert demo.main(["--transcript", str(tmp_path / "t.txt")]) == 2
-    assert "REFUSED" in (tmp_path / "t.txt").read_text()
+    named = ["--source-db", "demo_source", "--live-port", "4999", "--serve-script", "path/to/scratch-server-script",
+             "--server-cmd", OPERATOR_SERVER_CMD, "--seed", str(tmp_path / "seed.json")]
+    assert demo.main(["--transcript", str(tmp_path / "t.txt"), *named]) == 2
+    assert "REFUSED: run me inside Requisition's scratch-database wrapper" in (tmp_path / "t.txt").read_text()
+
+
+def test_main_refuses_until_the_live_port_and_the_source_database_are_named(monkeypatch, tmp_path):
+    monkeypatch.setenv("SCRATCH_DB", "scratch_20261110120000_1_2")
+    monkeypatch.setenv("PGDATABASE", "scratch_20261110120000_1_2")
+    for k in ("REQUISITION_URL", "ROLLBACK_SOURCE_DB", "ROLLBACK_SERVE_SCRIPT", "ROLLBACK_SERVER_CMD"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("REQUISITION_SEED", str(tmp_path / "seed.json"))
+    for k, v in {"REQUISITION_CRED": "rqc_dry_run_credential_0001", "REQUISITION_PRINCIPAL": "rqp_dry_run", "REQUISITION_LAB_KEY_FILE": "/nonexistent"}.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setenv("REQUISITION_DEMO_DIR", str(tmp_path))
+    started = []
+    monkeypatch.setattr(demo.ScratchLab, "start", lambda self: started.append(1))
+    monkeypatch.setattr(demo.ScratchLab, "copy_baseline", lambda self: started.append(2))
+    path = tmp_path / "t.txt"
+    assert demo.main(["--transcript", str(path), "--source-db", "demo_source", "--serve-script", "the-script"]) == 2
+    assert "REFUSED: name the live server's port" in path.read_text()
+    assert demo.main(["--transcript", str(path), "--live-port", "4999", "--serve-script", "the-script"]) == 2
+    assert "REFUSED: name the source database" in path.read_text()
+    assert demo.main(["--transcript", str(path), "--live-port", "4999", "--source-db", "demo_source",
+                      "--serve-script", "the-script"]) == 2
+    assert "REFUSED: name the command that starts Requisition's scratch server" in path.read_text()
+    assert demo.main(["--transcript", str(path), "--live-port", "4999", "--source-db", "demo_source",
+                      "--server-cmd", OPERATOR_SERVER_CMD]) == 2
+    assert "REFUSED: name Requisition's scratch-server script" in path.read_text()
+    assert demo.main(["--transcript", str(path), "--live-port", "4113", "--source-db", "demo_source",
+                      "--serve-script", "the-script"]) == 2
+    assert "REFUSED: port 4113 is the live demo server's" in path.read_text()
+    monkeypatch.setenv("REQUISITION_URL", "http://127.0.0.1:4113")  # the live server named by its URL alone
+    assert demo.main(["--transcript", str(path), "--source-db", "demo_source", "--serve-script", "the-script"]) == 2
+    assert "REFUSED: port 4113 is the live demo server's" in path.read_text()
+    assert started == []
+
+
+def test_the_demo_holds_no_command_of_the_server_and_no_place_inside_its_checkout(monkeypatch, tmp_path):
+    assert not hasattr(demo, "DEFAULT_SERVER_CMD")
+    text = (demo.ROOT / "demo" / "run_rollback_local.py").read_text()
+    assert "mi" + "x run" not in text and '"req"' not in text and "/req " not in text
+    # the seed file is the operator's too: --seed, else REQUISITION_SEED, else the demo stops before anything starts
+    for k in ("REQUISITION_SEED", "REQUISITION_URL"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("REQUISITION_DEMO_DIR", str(tmp_path))
+    with pytest.raises(SystemExit) as stopped:
+        demo.main(["--transcript", str(tmp_path / "t.txt"), "--live-port", "4999", "--source-db", "demo_source",
+                   "--server-cmd", "true"])
+    assert stopped.value.code == 2 and not (tmp_path / "t.txt").exists()
+
+
+def test_the_live_ports_are_the_named_ones_and_the_urls():
+    assert demo.live_ports([], "") == frozenset()
+    assert demo.live_ports([4999], "") == {4999}
+    assert demo.live_ports([4999], "http://127.0.0.1:5001/") == {4999, 5001}
+    assert demo.live_ports([], "https://requisition.example") == {443}
+    assert demo.live_ports([], "http://requisition.example/x") == {80}
+
+
+def test_the_demo_holds_no_database_name_and_no_port_of_an_installation():
+    text = (demo.ROOT / "demo" / "run_rollback_local.py").read_text()
+    assert not hasattr(demo, "PROTECTED") and not hasattr(demo, "LIVE_PORT") and not hasattr(demo, "SERVE")
+    assert 'default=os.environ.get("ROLLBACK_SOURCE_DB")' in text and "_demo2" not in text

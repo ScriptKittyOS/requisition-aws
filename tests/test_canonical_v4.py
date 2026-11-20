@@ -3,9 +3,9 @@
 """canonical_payload.v4: the package's encoder and the offline verifier's copy.
 
 The differential: every row of the shared vector file (tests/vectors/canonical_v4, a byte copy of requisition's
-test/support/fixtures/canonical_v4, both files pinned by SHA-256) gives exactly the row's canonical bytes, or a
+canonical version 4 fixture folder, both files pinned by SHA-256) gives exactly the row's canonical bytes, or a
 refusal with the row's reason, from requisition_aws.canonical.canonicalize_v4 AND from bin/verify_offline.py's
-canonicalize_v4. With CANONICAL_V4_RESULTS_DIR set, the answers are written for requisition's bin/canonical-v4-compare
+canonicalize_v4. With CANONICAL_V4_RESULTS_DIR set, the answers are written for requisition's four-way comparison tool
 (python.jsonl here, verifier.jsonl by tests/canonical_v4_verifier_runner.py).
 
 The rule tests call encode_v4 directly on Python values, with no reader in front: the integer bound is the
@@ -337,4 +337,4 @@ def test_a_record_that_says_the_v4_label_does_not_bind():
 
 
 # --- the published record and the published kit: checked in Requisition's own suite, where the kit, this
-# repository and Requisition's bin/lab-verify are all present (test/bin_scripts/requisition_aws_drift_test.exs).
+# repository and Requisition's bin/lab-verify are all present.

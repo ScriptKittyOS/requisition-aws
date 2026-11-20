@@ -14,8 +14,8 @@ signer-dev record lab_dev_key. This file's claims:
 
 The KMS-labelled record is the fake's own statement re-signed by the fake's Ed25519 key with the KMS
 labels (signer kms, kms_key_arn, a KMS key id), the key file given an entry for that id with signer
-kms: the shape Requisition's LabRecords writes under REQUISITION_LAB_SIGNER=kms (lab_records.ex
-labels/1). The real-lab-verify test runs the committed copy of Requisition's bin/lab-verify
+kms: the shape Requisition writes under REQUISITION_LAB_SIGNER=kms.
+The real-lab-verify test runs the committed copy of Requisition's bin/lab-verify
 (tests/fixtures/requisition/); the two mismatch tests use a stub lab-verify.
 """
 

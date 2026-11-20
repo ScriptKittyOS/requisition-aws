@@ -71,7 +71,7 @@ def test_full_flow_interrupt_approve_resume_allow_then_ran_mark(gate, registry, 
     [interrupt] = result.interrupts
     assert interrupt.name == INTERRUPT_NAME
     request_id = interrupt.reason["request_id"]
-    assert interrupt.reason["approval_url"] == "http://127.0.0.1:4103/approvals"
+    assert interrupt.reason["approval_url"] == "http://127.0.0.1:4000/approvals"
 
     fake.approve(request_id)
     result = resume(agent, result)

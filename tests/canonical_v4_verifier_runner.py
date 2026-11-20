@@ -10,7 +10,7 @@ Each row must come back as exactly the row's canonical bytes, or as a refusal wi
 
 CANONICAL_V4_FIXTURES names the fixture directory (default: this repository's byte copy, tests/vectors/canonical_v4).
 With CANONICAL_V4_RESULTS_DIR set, the per-row answers are written to <dir>/verifier.jsonl for requisition's
-bin/canonical-v4-compare. Exit 0 only when every row agrees and the two files are the pinned bytes.
+four-way comparison tool. Exit 0 only when every row agrees and the two files are the pinned bytes.
 """
 
 import base64

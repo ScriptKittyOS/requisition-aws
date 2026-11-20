@@ -2,23 +2,22 @@
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """An in-process stand-in for Requisition's lab /v1 API, for tests only. Not Requisition.
 
-It follows the semantics read from the Requisition version of 2026-10-26, cited per rule, so the adapters can be
+It follows the semantics read from the Requisition version of 2026-10-26, rule by rule, so the adapters can be
 tested end to end without the real server (which the tests must not write to):
 
-* propose: members (sanction_requests.ex:75-76, :105-111), the derived hash (:612-622), argument
-  validation (effector.ex:134), 201 {request_id, status: pending} (:208);
+* propose: members, the derived hash, argument
+  validation, 201 {request_id, status: pending};
 * GET: pending until two approvals (here: ``approve()``), then the statement minted once on the first
-  GET (sanction_requests.ex:223-231, :292-315, :346-398, :497-505); ``refuse()`` is a rejected
-  approval (:324-325);
-* execute: members (execute.ex:99-100), not_after window (:193-202), nonce claim and exact retry by
-  body digest (:335-368, :614-641), binding (:485-496), display digest (:498-502), single spend LAST
-  on the allow path (:504-522), the signed decision (:554-596) and its response (:644-662);
-* records: the lab labels (lab_records.ex:56-60) and key id (bin/lab-verify DEV_KEY_IDS), Ed25519
-  over the signed payload's bytes, receipt_hash = SHA-256 of them (lab_records.ex:141-150);
+  GET; ``refuse()`` is a rejected
+  approval;
+* execute: members, not_after window, nonce claim and exact retry by
+  body digest, binding, display digest, single spend LAST
+  on the allow path, the signed decision and its response;
+* records: the lab labels and key id (bin/lab-verify DEV_KEY_IDS), Ed25519
+  over the signed payload's bytes, receipt_hash = SHA-256 of them;
 * the chain (Requisition's lab as of 2026-11-09): every record is appended to its ``chain_scope``
   at ``sequence`` = head + 1 with ``previous_hash`` = the head's ``receipt_hash`` (nil for the first),
-  both inside the signed bytes (lab_store.ex:104-112 reserve/2, :125-140 head/1;
-  lab_records.ex:234-252 fields/4). The scope has the lab's form ``requisition-lab:account:<uuid>``.
+  both inside the signed bytes. The scope has the lab's form ``requisition-lab:account:<uuid>``.
 
 Test controls that model an operator, not a route: ``snapshot()``/``restore()`` (a database dump and
 restore: every row, the chain included, back to the dump; the signing keys are not database state and
@@ -46,10 +45,10 @@ from requisition_aws import canonical
 from requisition_aws.client import parse_instant, instant
 
 KEY_ID = "requisition_lab_dev_ed25519_v0"
-MLDSA_KEY_ID = "requisition_lab_dev_mldsa87_v0"  # lab_signer.ex seats/0
+MLDSA_KEY_ID = "requisition_lab_dev_mldsa87_v0"  # the key id of the lab's ML-DSA-87 seat
 ELEVEN = ("chain_scope", "sequence", "receipt_type", "subject_type", "subject_id", "status",
           "payload_hash", "previous_hash", "occurred_at", "metadata", "schema_version")
-LABELS = {"profile": "lab", "signer": "dev", "n6_profile": "not_followed", "hands": "one-person (G-301)"}
+LABELS = {"profile": "lab", "signer": "dev", "n6_profile": "not_followed", "hands": "one-person"}
 PROPOSE_MEMBERS = {"principal", "act_type", "act_hash", "act_hash_alg", "display", "class", "exp", "arm_statement_id"}
 EXECUTE_MEMBERS = {"principal", "act_type", "act_hash", "act_hash_alg", "display_projection", "statement_id", "nonce", "not_after"}
 CHAIN_SCOPE = "requisition-lab:account:00000000-0000-4000-8000-0000000000f1"  # the lab's form; a made-up account
@@ -75,10 +74,10 @@ class FakeRequisition:
     def __init__(self, credential="rqc_test_credential", principal="rqp_" + "0" * 32, act_types=None, now=None,
                  mldsa87_kinds=(), newer_routes=False, cosign=None, chain_scope=CHAIN_SCOPE):
         # mldsa87_kinds: record kinds ("statement", "decision") signed by an ML-DSA-87 seat instead
-        # (lab_signer.ex; the key file then carries both entries, lab_records.ex's required_seat).
+        # (the key file then carries both entries).
         # newer_routes: the newer routes (POST /v1/outcomes, GET /v1/sanction-requests?act_hash=,
-        # idempotency_key on propose). Off, they answer as the Requisition version of 2026-10-26 does (router.ex:114-124:
-        # GET /v1/sanction-requests is 405 method_not_allowed, /v1/outcomes 404 route_unknown).
+        # idempotency_key on propose). Off, they answer as the Requisition version of 2026-10-26 does:
+        # GET /v1/sanction-requests is 405 method_not_allowed, /v1/outcomes 404 route_unknown.
         self.mldsa87_kinds = set(mldsa87_kinds)
         # cosign (a planned shape, not from code): None (today), "signed"
         # (Ed25519 record + an ML-DSA-87 co-signature over the same bytes, beside it as "cosignature"),
@@ -145,7 +144,7 @@ class FakeRequisition:
         self.fail_paths: set[str] = set()  # paths answered 503
         self.calls: list[tuple[str, str]] = []
         # the caller credential's lifecycle: a refused credential answers 401 with its state's code
-        # (caller_credentials.ex: revoked, then expired, only after the secret matched); ``also_valid``
+        # (in Requisition's order: revoked, then expired, only after the secret matched); ``also_valid``
         # are other live credentials (a re-mint); ``expire_on = (method, path prefix)`` expires the
         # presented live credential AT that request (the expiry lands on that very call)
         self.credential_states: dict[str, str] = {}
@@ -161,7 +160,7 @@ class FakeRequisition:
         self.requests[request_id]["approved"] = True
 
     def revoke(self, request_id):
-        """An approval revoked after its statement was minted (execute.ex:614-642 then answers an
+        """An approval revoked after its statement was minted (Requisition then answers an
         exact retry of the allow decision_superseded)."""
         self.requests[request_id]["revoked"] = True
 
@@ -280,7 +279,7 @@ class FakeRequisition:
 
     def _record(self, receipt_type, subject_type, subject_id, metadata, kind=None):
         chain = self.chains.setdefault(self.chain_scope, [])
-        self.sequence = len(chain) + 1  # lab_store.ex reserve/2: head + 1 under the chain lock
+        self.sequence = len(chain) + 1  # as Requisition reserves it: head + 1 under the chain lock
         previous_hash = chain[-1]["receipt_hash"] if chain else None  # head/1: nil for the first
         pq = kind in self.mldsa87_kinds
         key_id = MLDSA_KEY_ID if pq else KEY_ID
@@ -302,7 +301,7 @@ class FakeRequisition:
             "schema_version": "agent_receipt.v1" if pq else 1,
         }
         payload = canonical.encode(fields).decode()
-        signer = self.mldsa_key if pq else self.key  # pure ML-DSA-87, empty context (lab_signer.ex)
+        signer = self.mldsa_key if pq else self.key  # pure ML-DSA-87, empty context
         record = {
             "signature": base64.b64encode(signer.sign(payload.encode())).decode(),
             "key_id": key_id,
@@ -327,7 +326,7 @@ class FakeRequisition:
 
     @staticmethod
     def agent_receipt_form(record):
-        """LabRecords.agent_receipt_form/1: the eleven fields as signed, plus signature and key_id."""
+        """Requisition's AgentReceipt form: the eleven fields as signed, plus signature and key_id."""
         signed = json.loads(record["signed_payload"])
         return {**{k: signed[k] for k in ELEVEN}, "signature": record["signature"], "key_id": record["key_id"]}
 
@@ -356,7 +355,7 @@ class FakeRequisition:
                 return self.propose(parsed)
             if path.startswith("/v1/sanction-requests?"):
                 if not (self.newer_routes and method == "GET"):
-                    return 405, {"error": "method_not_allowed"}, None  # router.ex:121 in the Requisition version of 2026-10-26
+                    return 405, {"error": "method_not_allowed"}, None  # the Requisition version of 2026-10-26
                 return self.lookup(path.split("?", 1)[1])
             if method == "POST" and path == "/v1/outcomes" and self.newer_routes:
                 return self.outcome(parsed)
@@ -534,13 +533,13 @@ class FakeRequisition:
         if _holds_float(body["display_projection"]):
             return 400, {"error": "float_refused"}, None
         digest = hashlib.sha256(canonical.encode(body)).hexdigest()
-        claim = self.claims.get((self.caller_id, body["nonce"]))  # execute.ex:335-368: per (caller, nonce)
+        claim = self.claims.get((self.caller_id, body["nonce"]))  # the nonce claim: per (caller, nonce)
         if claim is not None:
             if claim["digest"] != digest:
                 return 409, {"error": "nonce_reused_with_different_body"}, None
             stored = claim["response"]
             if stored["verdict"] == "allow":
-                # execute.ex:606-642: a stored allow re-runs steps 1-5; any deny now is decision_superseded
+                # as Requisition: a stored allow re-runs steps 1-5; any deny now is decision_superseded
                 found = self.statements.get(body["statement_id"])
                 row = found["row"] if found else None
                 exp = parse_instant(json.loads(found["record"]["signed_payload"])["metadata"]["exp"]) if found else None

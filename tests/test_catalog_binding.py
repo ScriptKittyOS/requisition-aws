@@ -3,14 +3,14 @@
 """G2: tool-description binding, the rug-pull refusal.
 
 Measured: the registered ``payments.refund_send`` schema is closed; an extra
-``tool_digest`` is refused ``member_out_of_schema`` (args_schema.ex:141-146 via effector.ex:155).
+``tool_digest`` is refused ``member_out_of_schema``.
 So the digest is a path in a NEW act type (``schema_version: 2``) whose ``tool_digest`` is
 an ``enum`` holding the approved digest(s), registered through the existing registration that two separate approver accounts approve
 (this repository writes the payload file and registers nothing). Requisition
 then refuses a drifted digest itself at propose (``malformed_member``), and the registration is the
 catalog pin. The act type is named ``payments.refund_send_v2``: a second row named
-``payments.refund_send`` is refused (``act_type_already_registered``, act_types.ex:102,110; the
-unique index on (account_id, name), lab migration 20261022130000:59).
+``payments.refund_send`` is refused (``act_type_already_registered``; the
+unique index on (account_id, name)).
 
 The digest (``catalog.tool_digest``): SHA-384 hex over ``CanonicalPayload`` v3 (``canonical.encode``)
 of the tool definition's present members among name, title, description, inputSchema,
@@ -150,7 +150,7 @@ def lab(clock, refund_tool):
 
 def gate_for(server, tmp_path, clock):
     client = Client(server.base_url, server.credential, server.principal, timeout=5)
-    return Gate(client, Store(str(tmp_path / "store.json"), clock=clock), approval_base_url="http://127.0.0.1:4103",
+    return Gate(client, Store(str(tmp_path / "store.json"), clock=clock), approval_base_url="http://127.0.0.1:4000",
                 keys=KeyRegistry.from_bytes(client.keys()), clock=clock)
 
 

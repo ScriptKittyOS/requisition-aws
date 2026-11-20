@@ -70,7 +70,7 @@ def test_without_newer_routes_the_outcome_is_unsupported_and_not_retried(gate, f
 
 
 def test_the_pre_newer_routes_answers_are_the_routers():
-    # router.ex:116-124 in the Requisition version of 2026-10-26: GET /v1/sanction-requests (any query) is a known path under
+    # the Requisition version of 2026-10-26: GET /v1/sanction-requests (any query) is a known path under
     # another method; /v1/outcomes an unknown path.
     from requisition_aws.client import UNSUPPORTED
 

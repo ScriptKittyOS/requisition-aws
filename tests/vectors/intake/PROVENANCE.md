@@ -5,11 +5,11 @@
 `canonical.ArgsSchema`) over raw JSON texts and argument objects and records each answer. requisition-ts commits the
 same file, byte for byte, as `test/vectors/python/intake.json`, and replays it against its own intake.
 
-requisition_aws tree: `d7c9330bbdf5d28edfa97d30f93647c94cfcfcf5` (`git rev-parse HEAD:requisition_aws`)
+requisition_aws tree: `9006aacc2210a0470fed1cc53503f47ff843522b` (`git rev-parse HEAD:requisition_aws`)
 
 | file | SHA-256 |
 |---|---|
-| `intake.json` | `bd6888a77c5624057bdd21269eae9ebb6e22ef4670b90bea93e39c2b537e2418` |
+| `intake.json` | `5905a2bc1c446da041b97c3eba378fe9f7887cb218f574db58cc8419241b9b1f` |
 
 Never edit it by hand. `tests/test_intake_vectors.py` checks the SHA-256 above and replays every row against the
 code in this checkout.

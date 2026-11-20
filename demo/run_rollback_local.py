@@ -3,36 +3,47 @@
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """The rollback demo, local only (F1).
 
-Run it only inside Requisition's bin/scratch-db, which creates a database for the demonstration and drops it
-after it:
+Run it only inside Requisition's scratch-database wrapper, which creates a database for the demonstration and
+drops it after it:
 
-    cd <requisition> && bin/scratch-db -- \
+    cd <requisition> && <its scratch-database wrapper> -- \
       <requisition-aws>/.venv/bin/python <requisition-aws>/demo/run_rollback_local.py \
-        --transcript <dir>/rollback.txt [--approved-file <dir>/approved] [--port 4113] [--dry-run]
+        --transcript <dir>/rollback.txt --source-db <the demo database> --live-port <the live server's port> \
+        --server-cmd '<the command that starts Requisition's scratch server>' --seed <the demo seed file> \
+        [--serve-script <Requisition's scratch-server script>] [--approved-file <dir>/approved] [--port 4113] [--dry-run]
 
     env: REQUISITION_CRED, REQUISITION_PRINCIPAL   the demo caller (it exists in the copied demo database)
          REQUISITION_LAB_KEY_FILE                  compared byte for byte with the scratch server's /v1/keys
+         ROLLBACK_SOURCE_DB, ROLLBACK_SERVER_CMD, ROLLBACK_SERVE_SCRIPT, REQUISITION_SEED
+                                                   stand in for --source-db, --server-cmd, --serve-script and --seed
+         REQUISITION_URL                           its port is a live port too, as if given with --live-port
+
+This file holds no name of a database, a server or a port of any installation, no command that starts the server
+and no place inside its checkout: the operator gives them. The command that starts the scratch server runs
+Requisition's own application, so Requisition's repository states it (at the head of its scratch-server script),
+not this one; the demo refuses to start a server until it is given the command. In the command, {port} stands for
+--port, {wrapper} for $REQUISITION_LOAD_WRAPPER (a memory cap, say; nothing when unset), {demo} for
+$REQUISITION_DEMO_DIR and {serve} for --serve-script.
 
 --dry-run: steps 1, 5 and 7's database half only (the copy, then a pg_dump snapshot and its pg_restore into
 the copy), no server: check the restore round trip first.
 
 Log in to the scratch console at http://localhost:<port> or in a separate browser profile: cookies ignore
 the port and both servers share the cookie name, so logging in on 127.0.0.1:<port> logs that browser out of
-the live server on 4103.
+the live server.
 
-What it does, in order (every database write lands in $SCRATCH_DB, which bin/scratch-db drops on exit):
+What it does, in order (every database write lands in $SCRATCH_DB, which the scratch-database wrapper drops on exit):
 
- 1. copies the demo database (--source-db, default autonomous_agency_aws_demo2) into $SCRATCH_DB:
+ 1. copies the demo database (--source-db) into $SCRATCH_DB:
     pg_dump of the source (read only) -> pg_restore into the scratch database. The source is never
-    written. It refuses to run unless $SCRATCH_DB is a bin/scratch-db name and $PGDATABASE equals it;
- 2. starts a SECOND Requisition server on 127.0.0.1:--port against $SCRATCH_DB (--server-cmd; the
-    default runs the Requisition demo checkout's dev endpoint through demo/rollback/serve_scratch.exs). The live demo
-    server on 4103 and its database are not touched. The port must be free before it starts (4103 is refused
-    outright), and the server counts as up only on its OWN line in scratch-server.log ("ROLLBACK SCRATCH
+    written. It refuses to run unless $SCRATCH_DB has the shape of the wrapper's names and $PGDATABASE equals it;
+ 2. starts a SECOND Requisition server on 127.0.0.1:--port against $SCRATCH_DB, with the operator's --server-cmd.
+    The live demo server and its database are not touched. The port must be free before it starts (a live port is refused
+    outright, and with no live port named nothing starts), and the server counts as up only on its OWN line in scratch-server.log ("ROLLBACK SCRATCH
     SERVER UP on 127.0.0.1:<port>, database $SCRATCH_DB"), so nothing else answering is ever talked to.
-    The default runs after $REQUISITION_LOAD_WRAPPER when it is set (a memory cap, say) as `mix run --no-compile --no-deps-check`
-    (the Requisition demo checkout's _build, shared with the live server, is never written: build it once beforehand);
-    Oban queues and plugins are off; stopping waits until the server's port is closed;
+    The command Requisition's scratch-server script states never compiles (the demo checkout's build, shared with
+    the live server, is never written: build it once beforehand) and runs with the server's background job queues
+    off; stopping waits until the server's port is closed;
  3. the agent's refund through the local Gateway TARGET form (requisition_aws.mcp_target, in process):
     call 1 files the request -> "awaiting approval";
  4. two approver accounts approve it in the scratch server's console; the operator then presses Enter
@@ -75,12 +86,13 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.parse
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from requisition_aws.client import Client  # noqa: E402
-from requisition_aws.demo_flow import Transcript, demo_dir, load_wrapper  # noqa: E402
+from requisition_aws.demo_flow import Transcript, demo_dir, demo_seed, load_wrapper  # noqa: E402
 from requisition_aws.gate import Gate  # noqa: E402
 from requisition_aws.keys import KeyRegistry  # noqa: E402
 from requisition_aws.mcp_target import Ledger, McpTarget, refund_tool  # noqa: E402
@@ -90,44 +102,61 @@ from requisition_aws.store import Store  # noqa: E402
 ACT_TYPE = "payments.refund_send"
 TOOL = "payments_refund_send"
 TOOL_ARGS = {"amount_minor": 4200, "currency": "EUR", "account": "acct-7310", "reason": "rollback demo: duplicate charge"}
-SCRATCH_NAME = re.compile(r"\Ascratch_[0-9]{14}_[0-9]+_[0-9]+\Z")  # what bin/scratch-db generates
-PROTECTED = ("autonomous_agency_dev", "autonomous_agency_test", "autonomous_agency_prod", "autonomous_agency_aws_demo2")
-SERVE = ROOT / "demo" / "rollback" / "serve_scratch.exs"
-DEFAULT_SERVER_CMD = ("{wrapper} bash -c 'source {demo}/env.sh && cd {demo}/req && export REQ_E2E_DB_NAME=\"$SCRATCH_DB\" "
-                      "ROLLBACK_PORT={port} && exec mix run --no-compile --no-deps-check --no-start {serve}'")
-# --no-compile --no-deps-check : the scratch server runs exactly the beams the live server runs
-# and never writes the Requisition demo checkout's _build, which the live server shares.
-LIVE_PORT = 4103
+SCRATCH_NAME = re.compile(r"\Ascratch_[0-9]{14}_[0-9]+_[0-9]+\Z")  # the shape of the scratch-database wrapper's names
+# No list of databases to protect is kept: the one database this demo writes is $SCRATCH_DB, only when its name has
+# the shape above and $PGDATABASE equals it, so a database of any other name can never be the target.
+# No command that starts a server is kept either: it runs Requisition's own application, so Requisition's repository
+# states it, and the operator gives it (--server-cmd, or $ROLLBACK_SERVER_CMD).
 CLAIM = ("If Requisition's database is rolled back, the same executor, with its own records intact, refuses to act "
          "again, and the rollback leaves two different records signed by the service's key at one chain position, "
          "which anyone can check offline. Lab profile, lab key. (when nothing was appended between the snapshot and "
          "the mint; step 7 checks this and stops otherwise).")
 COOKIE_NOTE = ("note: log in to the scratch console at http://localhost:{port} or in a separate browser profile: cookies "
-               "ignore the port, so logging in on 127.0.0.1:{port} logs that browser out of the live server on 4103")
+               "ignore the port, so logging in on 127.0.0.1:{port} logs that browser out of the live server (port {live})")
 
 
 class Refused(Exception):
     pass
 
 
+def live_ports(given: list[int], url: str) -> frozenset:
+    """The ports the scratch server must never take: each --live-port, and the port of REQUISITION_URL when it has
+    one (its scheme's default port otherwise)."""
+    ports = set(given)
+    if url:
+        parts = urllib.parse.urlsplit(url)
+        port = parts.port or {"http": 80, "https": 443}.get(parts.scheme)
+        if port:
+            ports.add(port)
+    return frozenset(ports)
+
+
 # --- the database and the server: one interface, so the flow is testable against the fake ----------
 
 
 class ScratchLab:
-    """The real thing: $SCRATCH_DB (bin/scratch-db's), pg_dump/pg_restore, a second server."""
+    """The real thing: $SCRATCH_DB (the scratch-database wrapper's), pg_dump/pg_restore, a second server."""
 
     def __init__(self, *, source_db: str, port: int, server_cmd: str, out_dir: pathlib.Path, t: Transcript,
-                 start_timeout: float = 240.0, stop_timeout: float = 30.0):
-        if port == LIVE_PORT:
-            raise Refused(f"port {LIVE_PORT} is the live demo server's; the scratch server needs its own port")
+                 start_timeout: float = 240.0, stop_timeout: float = 30.0, live_ports: frozenset = frozenset(),
+                 serve: str | None = None, needs_server: bool = True):
+        if port in live_ports:
+            raise Refused(f"port {port} is the live demo server's; the scratch server needs its own port")
         scratch, pgdatabase = os.environ.get("SCRATCH_DB", ""), os.environ.get("PGDATABASE", "")
         if not SCRATCH_NAME.match(scratch) or pgdatabase != scratch:
-            raise Refused("run me inside bin/scratch-db: $SCRATCH_DB must be its generated name and $PGDATABASE equal to it")
-        if scratch in PROTECTED or source_db == scratch or not source_db:
-            raise Refused("the scratch database must be neither the source nor a protected database")
+            raise Refused("run me inside Requisition's scratch-database wrapper: $SCRATCH_DB must be its generated name "
+                          "and $PGDATABASE equal to it")
+        if source_db == scratch or not source_db:
+            raise Refused("name the source database (--source-db); it must not be the scratch database")
+        if needs_server and not server_cmd:
+            raise Refused("name the command that starts Requisition's scratch server (--server-cmd, or "
+                          "$ROLLBACK_SERVER_CMD): Requisition's scratch-server script states it")
+        if "{serve}" in server_cmd and not serve:
+            raise Refused("name Requisition's scratch-server script (--serve-script, or $ROLLBACK_SERVE_SCRIPT): "
+                          "it is a file of Requisition's repository")
         self.scratch, self.source_db, self.port, self.out_dir, self.t = scratch, source_db, port, out_dir, t
         folder = demo_dir() if "{demo}" in server_cmd else pathlib.Path()
-        self.server_cmd = server_cmd.format(demo=folder, wrapper=load_wrapper(), port=port, serve=SERVE).lstrip()
+        self.server_cmd = server_cmd.format(demo=folder, wrapper=load_wrapper(), port=port, serve=serve).lstrip()
         self.url = f"http://127.0.0.1:{port}"
         self.proc: subprocess.Popen | None = None
         self.start_timeout = start_timeout
@@ -382,18 +411,28 @@ def _stop(lab, t: Transcript) -> bool:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--transcript", required=True)
-    ap.add_argument("--source-db", default="autonomous_agency_aws_demo2")
+    ap.add_argument("--source-db", default=os.environ.get("ROLLBACK_SOURCE_DB"),
+                    help="the demo database to copy (read only); or ROLLBACK_SOURCE_DB")
     ap.add_argument("--port", type=int, default=4113)
-    ap.add_argument("--server-cmd", default=DEFAULT_SERVER_CMD)
-    ap.add_argument("--seed", default=None, help="default: under REQUISITION_DEMO_DIR")
+    ap.add_argument("--live-port", type=int, action="append", default=[],
+                    help="a port the scratch server must never take (the live server's); the port of REQUISITION_URL "
+                         "is one too")
+    ap.add_argument("--serve-script", default=os.environ.get("ROLLBACK_SERVE_SCRIPT"),
+                    help="Requisition's scratch-server script, put where --server-cmd says {serve}; or "
+                         "ROLLBACK_SERVE_SCRIPT")
+    ap.add_argument("--server-cmd", default=os.environ.get("ROLLBACK_SERVER_CMD"),
+                    help="the command that starts Requisition's scratch server (no default; not needed with "
+                         "--dry-run); or ROLLBACK_SERVER_CMD")
+    ap.add_argument("--seed", default=None, help="the seed file; or REQUISITION_SEED (no default; not needed with "
+                                                 "--dry-run)")
     ap.add_argument("--approved-file")
     ap.add_argument("--require-pq", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--dry-run", action="store_true",
                     help="the copy and the pg_dump/pg_restore round trip only; stops before the server")
     a = ap.parse_args(argv)
-    DEMO = demo_dir()
-    if a.seed is None:
-        a.seed = str(DEMO / "req" / "lab" / "seed" / "aws_demo.v1.json")
+    demo_dir()
+    if not a.dry_run:
+        a.seed = demo_seed(a.seed)
     missing = [k for k in ("REQUISITION_CRED", "REQUISITION_PRINCIPAL", "REQUISITION_LAB_KEY_FILE") if not os.environ.get(k)]
     if missing:
         ap.error("set " + ", ".join(missing))
@@ -402,14 +441,19 @@ def main(argv=None) -> int:
     out_dir = tpath.with_name(tpath.stem + "-records")
     out_dir.mkdir(parents=True, exist_ok=True)
     t = Transcript((cred,))
+    live = live_ports(a.live_port, os.environ.get("REQUISITION_URL", ""))
     try:
-        lab = ScratchLab(source_db=a.source_db, port=a.port, server_cmd=a.server_cmd, out_dir=out_dir, t=t)
+        if not live:
+            raise Refused("name the live server's port (--live-port, or REQUISITION_URL), so that the scratch server "
+                          "can never take it")
+        lab = ScratchLab(source_db=a.source_db or "", port=a.port, server_cmd=a.server_cmd or "", out_dir=out_dir, t=t,
+                         live_ports=live, serve=a.serve_script, needs_server=not a.dry_run)
     except Refused as refusal:
         t.say(f"REFUSED: {refusal}")
         t.write(str(tpath))
         return 2
     t.say("ROLLBACK DEMO (local; no AWS). Claim: " + CLAIM)
-    t.say(COOKIE_NOTE.format(port=a.port))
+    t.say(COOKIE_NOTE.format(port=a.port, live=", ".join(map(str, sorted(live)))))
     out: dict = {}
     if a.dry_run:
         try:

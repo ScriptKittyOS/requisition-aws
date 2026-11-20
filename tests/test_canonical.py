@@ -4,14 +4,14 @@
 
 Sources of the known answers (all read from the Requisition version of 2026-10-26, never computed by
 this port):
-  * canonical_payload_test.exs:67,79      the golden map's bytes (no float in our domain: the
+  * its canonical payload tests           the golden map's bytes (no float in our domain: the
                                           golden carries 2.5, so only its float-free half is used)
-  * canonical_payload_test.exs:163,203    literals
-  * canonical_payload_test.exs:207-212    the RFC 8785 Appendix B string, Jason's upper-case escape
-  * canonical_payload_test.exs:175-189    the UTF-16 key order
-  * test/support/fixtures/execute_api_lab/act_hash_v3/  vectors V1 and V2: never copied here (they are
+  * the same tests                        literals
+  * the same tests                        the RFC 8785 Appendix B string, Jason's upper-case escape
+  * the same tests                        the UTF-16 key order
+  * its act hash vectors V1 and V2: never copied here (they are
                                           effector material); Requisition's own suite runs this package's
-                                          act_hash over them (test/bin_scripts/requisition_aws_drift_test.exs).
+                                          act_hash over them.
 """
 
 import hashlib
@@ -33,13 +33,13 @@ SEED = pathlib.Path(__file__).resolve().parent / "fixtures" / "seed" / "aws_demo
 
 
 def test_literals_known_answer():
-    # canonical_payload_test.exs:163 and :203
+    # literals, from Requisition's canonical payload tests
     assert canonical.encode({"c": False, "a": None, "b": True}) == b'{"a":null,"b":true,"c":false}'
     assert canonical.encode({"literals": [None, True, False]}) == b'{"literals":[null,true,false]}'
 
 
 def test_rfc8785_appendix_b_string_with_jasons_upper_case_escape():
-    # canonical_payload_test.exs:207-212: Jason escapes U+000F as \u000F (upper-case), "/" is not
+    # the RFC 8785 Appendix B string, from the same tests: Jason escapes U+000F as \u000F (upper-case), "/" is not
     # escaped, non-ASCII is raw UTF-8
     value = {"string": "€$\u000f\nA'B\"\\/"}
     expected = '{"string":"€$\\u000F\\nA\'B\\"\\\\/"}'.encode("utf-8")
@@ -47,12 +47,12 @@ def test_rfc8785_appendix_b_string_with_jasons_upper_case_escape():
 
 
 def test_short_escapes_are_jasons():
-    # deps/jason/lib/encode.ex:284-293: \b \t \n \f \r \" \\ short; other C0 as \u00XX upper hex
+    # Jason's encoder: \b \t \n \f \r \" \\ short; other C0 as \u00XX upper hex
     assert canonical.encode("\b\t\n\f\r\"\\\x01\x1f\x7f") == b'"\\b\\t\\n\\f\\r\\"\\\\\\u0001\\u001F\x7f"'
 
 
 def test_keys_sort_by_utf16_code_units():
-    # canonical_payload_test.exs:175-189: the RFC 8785 3.2.3 sort
+    # the RFC 8785 3.2.3 sort, from the same tests
     euro, ctrl, smiley, o_d, dalet = "€", "\u0080", "\U0001f602", "ö", "דּ"
     value = {
         euro: 1, "\r": 1, "\n": 1, "1": 1, ctrl: 1, smiley: 1, o_d: 1, dalet: 1, "</script>": 1,
@@ -94,13 +94,13 @@ def test_act_hash_puts_act_type_inside_and_refuses_a_member_named_act_type():
     pre = canonical.preimage("payments.refund_send", args)
     assert pre == b'{"act_type":"payments.refund_send","agent":"a","args":{"amount_minor":1}}'
     assert canonical.act_hash("payments.refund_send", args) == hashlib.sha384(pre).hexdigest()
-    # args_schema.ex:23-25 refuses a top-level act_type at registration; the port refuses it too
+    # Requisition refuses a top-level act_type at registration; the port refuses it too
     with pytest.raises(CanonicalRefusal):
         canonical.act_hash("x", {"act_type": "y"})
 
 
 def test_display_digest_is_sha256_of_the_arguments_without_act_type():
-    # Effector.encode/2 (an argument row's stored bytes and display_digest)
+    # an argument row's stored bytes and display_digest
     args = {"b": 1, "a": "x"}
     assert canonical.display_digest(args) == hashlib.sha256(b'{"a":"x","b":1}').hexdigest()
 
@@ -145,10 +145,10 @@ def test_check_string_refusals(value, code):
         "acct-7781",
         "customer requested refund",
         "Résumé café",  # NFC non-ASCII
-        "SecretStores.LocalFile",  # bare token glued to a dot: redaction.ex:220-223 keeps it
+        "SecretStores.LocalFile",  # bare token glued to a dot: the redactor keeps it
         "integrations/secret_stores/",
-        "token refresh failed",  # redaction.ex:160-162 keeps prose
-        "credential_isolation=server_side_only",  # redaction.ex:139-141
+        "token refresh failed",  # the redactor keeps prose
+        "credential_isolation=server_side_only",  # a value the redactor keeps
     ],
 )
 def test_check_string_accepts(value):
@@ -164,7 +164,7 @@ def test_redaction_replays_the_pipeline_not_a_simple_match():
 
 
 def test_configured_secret_values_are_refused_when_known():
-    # redaction.ex:618-623: a configured env secret of at least 8 characters anywhere in a value
+    # the redactor: a configured env secret of at least 8 characters anywhere in a value
     assert canonical.would_redact("pay acct ZZZZZZZZ1", configured_secrets=["ZZZZZZZZ1"]) is True
     assert canonical.would_redact("pay acct ZZZZ", configured_secrets=["ZZZZ"]) is False
 
@@ -241,7 +241,7 @@ def test_check_arguments_a_float_as_the_whole_arguments_value_stays_malformed_me
         assert (err.value.code, err.value.path) == ("malformed_member", ""), value
 
 
-# --- the args schema (args_schema.ex), the subset the demo seed uses ---------------------------
+# --- the args schema (Requisition's), the subset the demo seed uses ---------------------------
 
 SEED_SCHEMA = [
     {"path": "agent", "type": "s", "required": True, "min_length": 1, "max_length": 64},

@@ -18,13 +18,14 @@ stranger's offline check of one ACCOUNT chain export against records held outsid
 * Signatures: Ed25519 by a pinned copy of verify_receipt.py's RFC 8032 routine (requisition
   bench/holytrinity-v2/verifier/verify_receipt.py, sha256 6414bcb3...86db8c, as published in receipt-verification r4, recorded in
   bin/vendor/VENDORED.md); ML-DSA-87 by the vendored mldsa. --require-pq: every agent-tool record (the
-  ones whose signed metadata carries ``cosign``, lab_records.ex:44-64) needs a valid ML-DSA-87
+  ones whose signed metadata carries ``cosign``) needs a valid ML-DSA-87
   signature over its own bytes; other records are reported "Ed25519 only".
 * Codes: ``ok``, ``link_broken``, ``sequence_gap``, ``sequence_duplicate``, ``held_record_differs``,
   ``export_short``, ``equivocation``, ``signature_invalid``, ``pq_missing``, ``held_other_scope``,
   ``held_record_invalid``, ``export_not_from_genesis``. Each FAIL names its records (both, for a pair).
 * --json: ``{"result": "ok" | "FAIL", "chain_scope", "failures": [{"code", "sequence", "detail",
-  "records": [envelope, ...]}]}``. Text: a line per check, the last ``RESULT ok`` or ``RESULT FAIL``.
+  "records": [envelope, ...]}]}``. Text: a line per check, then ``RESULT ok`` or ``RESULT FAIL``; after
+  ``RESULT ok`` comes the one sentence a pass ends with (tests/test_pass_lines.py).
 * Exit 0 ok, 1 FAIL, 2 usage or refusal.
 
 Fixtures: chains signed by tests/fake_requisition.py at test time (labelled: the export carries the
@@ -54,6 +55,7 @@ from requisition_aws.store import Store
 from .conftest import ACT_TYPE, refund_args
 from .fake_requisition import FAKE_PROVENANCE, FakeRequisition
 from .test_canonical import SEED_SCHEMA
+from .test_pass_lines import PASS_LINE
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "bin" / "verify_chain.py"
@@ -159,7 +161,7 @@ class Chain:
         self.fake.base_url = self.fake.start()
         client = Client(self.fake.base_url, self.fake.credential, self.fake.principal, timeout=5)
         self.gate = Gate(client, Store(str(tmp_path / f"chain-{id(self)}.json"), clock=clock),
-                         approval_base_url="http://127.0.0.1:4103", keys=KeyRegistry.from_bytes(client.keys()),
+                         approval_base_url="http://127.0.0.1:4000", keys=KeyRegistry.from_bytes(client.keys()),
                          clock=clock, allow_classical_only=True)  # seat_absent / over-bound chains are the premise
         self.args = arguments_object("refund-agent", "s-chain", ACT_TYPE, refund_args())
         self.fake.pump_denies(2)
@@ -224,7 +226,7 @@ def test_a_good_export_with_held_records_is_ok(chain, tmp_path):
     assert proc.returncode == 0 and report["result"] == "ok" and report["failures"] == []
     assert report["chain_scope"] == signed(chain.S)["chain_scope"]
     text, _ = run(tmp_path, chain.fake.registry, write(tmp_path, "e.json", chain.export), [held], as_json=False)
-    assert text.returncode == 0 and text.stdout.strip().splitlines()[-1] == "RESULT ok"
+    assert text.returncode == 0 and text.stdout.strip().splitlines()[-2:] == ["RESULT ok", PASS_LINE]
 
 
 def test_the_sql_export_csv_form_is_read(chain, tmp_path):

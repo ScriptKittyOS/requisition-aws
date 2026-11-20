@@ -11,8 +11,8 @@ it reads two files and writes one; no network, no AWS, no Requisition call.
 The output's set is ``aws_demo_v2`` and its ``tool_digest`` enum holds every form's pin: the Strands
 digest already in the incomplete file, then the digest of the Gateway's listed definition of
 ``--tool``. A capture without that tool, or with a definition that has no digest (a float), is refused
-and nothing is written. The lab's operator then copies the output to the requisition repository's
-``lab/seed/aws_demo_v2.v1.json`` and registers it (deploy/registration/README.md).
+and nothing is written. The lab's operator then copies the output into the seed folder of the
+Requisition checkout and registers it (deploy/registration/README.md).
 """
 
 from __future__ import annotations

@@ -9,7 +9,7 @@ Both files were fetched 2026-11-09 from raw.githubusercontent.com at pinned comm
   `975de31eb83d87039ec88934fdc47d8c312b892d`, file
   `gen-val/json-files/ML-DSA-sigVer-FIPS204/internalProjection.json`.
 - Upstream file sha256: `47cdd6314c7f746d02421ffcba89d4dbc7bb875ac49e07a029fdfc26fba55437` (the same
-  file and digest Requisition pins at `toolchain/kat/`).
+  file and digest Requisition pins).
 - **Modified 2026-11-09:** kept only the test group whose `parameterSet` is `ML-DSA-87`,
   `signatureInterface` `external`, `preHash` `pure`, `externalMu` false (tgId 5, tcIds 61-75: 3 valid,
   12 invalid: modified message, commitment, hint, z), the form the lab seat signs and the vendored

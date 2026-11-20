@@ -3,8 +3,8 @@
 """The adapter's idempotency store.
 
 Why it exists: Requisition's propose has no idempotency key and no lookup by ``act_hash``
-(``sanction_requests.ex:75``: no nonce member; ``v1/router.ex:114-124``: no such route), and an exact
-execute retry must resend the same body, ``not_after`` included (``execute.ex:335-368``, ``:193-202``).
+(its propose body has no nonce member, and it has no such route), and an exact
+execute retry must resend the same body, ``not_after`` included.
 So the adapter remembers, before each call:
 
 * ``proposals``: keyed on ``act_hash`` alone (the arguments object carries ``agent`` and

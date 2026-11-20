@@ -31,19 +31,19 @@ def args_obj(**over):
 def test_propose_body_shape(client):
     args = args_obj()
     body = loads_strict(client.propose_body(ACT_TYPE, args))
-    # sanction_requests.ex:75-76: exactly these members, no nonce
+    # propose: exactly these members, no nonce
     assert set(body) == {"principal", "act_type", "act_hash", "act_hash_alg", "display"}
     assert body["act_hash_alg"] == "sha384+canonical_payload.v3"
     assert body["display"] == args
     assert body["act_hash"] == canonical.act_hash(ACT_TYPE, args)
-    assert len(body["act_hash"]) == 96  # sanction_requests.ex:82
+    assert len(body["act_hash"]) == 96  # SHA-384 in hex
 
 
 def test_execute_body_shape(client):
     args = args_obj()
     raw = client.execute_body(ACT_TYPE, args, "ab" * 32, "n" * 10, "2026-11-09T12:02:00Z")
     body = loads_strict(raw)
-    # execute.ex:99-100
+    # execute: exactly these members
     assert set(body) == {
         "principal", "act_type", "act_hash", "act_hash_alg", "display_projection", "statement_id", "nonce", "not_after",
     }
@@ -141,7 +141,7 @@ def test_propose_is_deduplicated_on_act_hash(gate, fake):
     assert first.request_id == second.request_id
     assert first.filed_now and not second.filed_now
     assert sum(1 for m, p in fake.calls if m == "POST" and p == "/v1/sanction-requests") == 1
-    assert first.status == "pending" and first.approval_url == "http://127.0.0.1:4103/approvals"
+    assert first.status == "pending" and first.approval_url == "http://127.0.0.1:4000/approvals"
 
 
 def test_sanctioned_execute_allow_then_spent_closes_dedupe(gate, fake, clock):

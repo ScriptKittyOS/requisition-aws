@@ -3,7 +3,7 @@
   "generator": "tools/gen_python_vectors.py",
   "python": "3.12.3",
   "reference": "requisition-aws",
-  "requisition_aws_tree": "d7c9330bbdf5d28edfa97d30f93647c94cfcfcf5",
+  "requisition_aws_tree": "9006aacc2210a0470fed1cc53503f47ff843522b",
   "seed": 20261110,
   "unicodedata": "15.0.0"
  },

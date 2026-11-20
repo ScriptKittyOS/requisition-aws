@@ -2,7 +2,7 @@
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """ONE explicit bound on every strict JSON reader -- nesting of at most 64 containers and
 integers within +-(2^53-1), the range CanonicalPayload v3 allows -- the same in Python (these readers), TypeScript
-(parseBounded) and Elixir (LabKeyRule.decode_bounded/1). The documents are the shared vector file's `documents` section.
+(parseBounded) and Elixir (Requisition's bounded JSON reader). The documents are the shared vector file's `documents` section.
 A refusal is a ValueError, never a RecursionError or a traceback."""
 
 import importlib.util

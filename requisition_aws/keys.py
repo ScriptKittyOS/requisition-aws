@@ -2,14 +2,14 @@
 # Copyright 2026 Sudo Apt Holdings LLC (Script Kitty OS & Labs)
 """Ed25519 checks of lab records inside the adapter (optional; ``bin/lab-verify`` is the offline check).
 
-A lab record is the four-field envelope ``{signature, key_id, signed_payload, receipt_hash}``
-(``sanction_requests.ex:509-517``); the signature is Ed25519 over the UTF-8 bytes of
-``signed_payload`` and ``receipt_hash`` is their SHA-256 (``lab_records.ex:141-150``;
-``bench/holytrinity-v2/verifier/verify_receipt.py:423-434``). The key file is what ``GET /v1/keys``
-serves (``router.ex:251-264``): ``{"entries": [{key_id, algorithm, public_key (base64),
+A lab record is the four-field envelope ``{signature, key_id, signed_payload, receipt_hash}``;
+the signature is Ed25519 over the UTF-8 bytes of
+``signed_payload`` and ``receipt_hash`` is their SHA-256 (the public receipt verifier,
+``verify_receipt.py``, checks both). The key file is what ``GET /v1/keys``
+serves: ``{"entries": [{key_id, algorithm, public_key (base64),
 public_key_fingerprint (sha256 hex of the raw key), status, ...}]}``.
 
-THE KEY RULE (requisition lib/autonomous_agency/authority/execute_api/lab_key_rule.ex is its text,
+THE KEY RULE (the issuing server's key rule is its text,
 tests/vectors/key_rule_vectors.v1.json its vectors, run against every verifier). For a record whose signed
 ``occurred_at`` is T and a key entry E, in this order: status ``compromised``/``revoked`` -> ``key_revoked``;
 status not ``active``/``retired`` (or ``retired`` with no valid_to) -> ``key_status_unusable``; valid_from/valid_to
@@ -18,9 +18,9 @@ valid_from <= T < valid_to (valid_to null: open) -> ``key_not_valid_at_signing``
 given and E.signer is not in it -> ``signer_not_accepted``. Otherwise the signature is checked. ``check`` returns
 the reason (or ``signature_invalid`` / ``unknown_key`` / ``key_file_unreadable``); ``verify`` is ``check is None``.
 
-An entry with ``"algorithm": "mldsa87"`` (the lab's ML-DSA-87 seat, ``lab_signer.ex``: key id
+An entry with ``"algorithm": "mldsa87"`` (the lab's ML-DSA-87 seat: key id
 ``requisition_lab_dev_mldsa87_v0``, a 2,592-byte public key) is checked as pure ML-DSA-87 with the
-empty context over the same bytes (``requisition.lab.verify_mldsa87.ex``), by the vendored verifier
+empty context over the same bytes, by the vendored verifier
 (``requisition_aws.pq``), under the same key rule as an Ed25519 key (a retired ML-DSA-87 key still verifies
 its own window).
 
@@ -47,6 +47,7 @@ import time
 
 from . import pq
 from .client import loads_strict
+from .settings import seconds
 
 ED25519 = "ed25519"
 MLDSA87 = "mldsa87"
@@ -93,7 +94,7 @@ def key_standing(entry, occurred_at, accept_signers=None):
 
 
 
-# --- ED25519 KEY MATERIAL : one text in keys.py, verify_chain.py, bin/lab-verify and bin/lab-log-verify ---
+# --- ED25519 KEY MATERIAL : one text in keys.py, verify_chain.py, bin/lab-verify and Requisition's log checker ---
 # edwards25519 (RFC 8032 section 5.1): p, the prime group order L, d, and sqrt(-1) = 2^((p-1)/4)
 _P = 2**255 - 19
 _L = 2**252 + 27742317777372353535851937790883648493
@@ -265,7 +266,8 @@ class KeyRegistry:
     def from_env(cls, env: dict) -> "KeyRegistry":
         """The entry points' key file: ``REQUISITION_KEYS_FILE`` (required), ``REQUISITION_ACCEPT_SIGNERS`` (comma
         separated signer labels; default ``kms``: KMS custody bounds what verifies; ``any`` lifts it; empty is
-        refused) and ``REQUISITION_KEYS_MAX_AGE_SECONDS`` (default 300, the bound on a stale key file)."""
+        refused) and ``REQUISITION_KEYS_MAX_AGE_SECONDS`` (default 300, the bound on a stale key file: a finite decimal
+        above zero, anything else refuses to start, settings.py)."""
         text = env.get("REQUISITION_ACCEPT_SIGNERS", "kms")
         if text.strip() == "any":
             accept = None
@@ -274,7 +276,7 @@ class KeyRegistry:
             if not all(accept):
                 raise KeyError_("REQUISITION_ACCEPT_SIGNERS is a comma-separated list of signer labels, or 'any'")
         return cls.from_file(env["REQUISITION_KEYS_FILE"], accept_signers=accept,
-                             max_age_seconds=float(env.get("REQUISITION_KEYS_MAX_AGE_SECONDS", "300")))
+                             max_age_seconds=seconds(env, "REQUISITION_KEYS_MAX_AGE_SECONDS", 300))
 
     @staticmethod
     def _stamp(path):
